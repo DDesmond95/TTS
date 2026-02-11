@@ -1,0 +1,119 @@
+// ======================================================
+// VS Code Dev Container for Qwen3-TTS / CosyVoice
+// ======================================================
+// - Uses Docker (NOT docker-in-docker)
+// - Uses host NVIDIA GPU via --gpus=all
+// - Designed for CUDA 12.x + FlashAttention 2
+// - Non-root user matches host UID to avoid permission issues
+// ======================================================
+{
+    // Name shown in VS Code Dev Containers UI
+    "name": "Qwen3 / CosyVoice TTS (CUDA)",
+    // --------------------------------------------------
+    // Build configuration
+    // --------------------------------------------------
+    "build": {
+        // Dockerfile relative to this devcontainer.json
+        "dockerfile": "Dockerfile",
+        // Build arguments passed into Dockerfile
+        "args": {
+            // CUDA image tag (runtime driver on host can be newer)
+            // We intentionally use a *devel* image for FlashAttention
+            "CUDA_IMAGE_TAG": "12.9.1-cudnn-devel-ubuntu22.04",
+            // Must match host username and UID to avoid permission issues
+            "USERNAME": "desmondlyh",
+            "USER_UID": "1002"
+        }
+    },
+    // --------------------------------------------------
+    // Runtime arguments passed to `docker run`
+    // --------------------------------------------------
+    "runArgs": [
+        // Expose all NVIDIA GPUs inside the container
+        "--gpus=all",
+        // Increase shared memory
+        // REQUIRED for FlashAttention builds and large PyTorch ops
+        "--shm-size=16g",
+        // Name of the container
+        "--name",
+        "qwen3-cosyvoice-tts-cuda"
+    ],
+    // --------------------------------------------------
+    // SSH behavior
+    // --------------------------------------------------
+    // Disable VS Code SSH agent forwarding.
+    // This avoids:
+    //   sign_and_send_pubkey: agent refused operation
+    // and forces OpenSSH inside the container to read keys directly
+    // from ~/.ssh (mounted below).
+    "remoteEnv": {
+        "SSH_AUTH_SOCK": ""
+    },
+    // --------------------------------------------------
+    // Workspace configuration
+    // --------------------------------------------------
+    // Path inside container where the project is mounted
+    "workspaceFolder": "/workspace",
+    // Bind mounts:
+    // 1. Project directory → /workspace
+    // 2. Host ~/.ssh → container ~/.ssh (read-only)
+    //
+    // This avoids copying files and prevents permission mismatches.
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind",
+        "source=${env:HOME}/.ssh,target=/home/desmondlyh/.ssh,type=bind,readonly"
+    ],
+    // --------------------------------------------------
+    // Host requirements
+    // --------------------------------------------------
+    // Prevents container startup on machines without GPUs
+    "hostRequirements": {
+        "gpu": true
+    },
+    // --------------------------------------------------
+    // Port forwarding
+    // --------------------------------------------------
+    // 7860 → Gradio demos (Qwen3-TTS / CosyVoice)
+    // 8888 → Jupyter / JupyterLab
+    "forwardPorts": [
+        7860,
+        8888
+    ],
+    // --------------------------------------------------
+    // Lifecycle commands
+    // --------------------------------------------------
+    // postCreateCommand:
+    // - Runs AFTER container is built
+    // - Install runtime dependencies first (torch, qwen-tts, etc.)
+    "postCreateCommand": "pip install -r requirements.txt",
+    // onCreateCommand:
+    // - Runs once after container creation
+    // - Install developer-only tools (Jupyter, widgets, etc.)
+    "onCreateCommand": "pip install -r dev-requirements.txt",
+    // --------------------------------------------------
+    // VS Code customization
+    // --------------------------------------------------
+    "customizations": {
+        "vscode": {
+            // Default shell inside VS Code terminal
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash"
+            },
+            // Recommended extensions for Python + ML work
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "tamasfe.even-better-toml",
+                "redhat.vscode-yaml"
+            ]
+        }
+    },
+    // --------------------------------------------------
+    // User
+    // --------------------------------------------------
+    // Use the non-root user created in the Dockerfile
+    "remoteUser": "desmondlyh"
+}
