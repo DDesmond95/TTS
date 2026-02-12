@@ -5,7 +5,7 @@ import logging
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -45,7 +45,7 @@ class TTSEngine:
         self.runtime = runtime
 
         self._sem = asyncio.Semaphore(max(1, int(runtime.max_concurrent_jobs)))
-        self._cache: "OrderedDict[str, Loaded]" = OrderedDict()
+        self._cache: OrderedDict[str, Loaded] = OrderedDict()
 
     def list_models(self) -> list[dict]:
         out = []
@@ -90,7 +90,7 @@ class TTSEngine:
         return "unknown"
 
     def _resolve_model(
-        self, model: Optional[str], expected_kind: Optional[str] = None
+        self, model: str | None, expected_kind: str | None = None
     ) -> str:
         """
         Resolve either:
@@ -161,12 +161,12 @@ class TTSEngine:
 
     async def run_custom_voice(
         self,
-        text: Union[str, List[str]],
-        language: Union[str, List[str]] = "Auto",
-        speaker: Union[str, List[str]] = "Ryan",
-        instruct: Union[str, List[str]] = "",
-        model: Optional[str] = None,
-        gen: Optional[Dict[str, Any]] = None,
+        text: str | list[str],
+        language: str | list[str] = "Auto",
+        speaker: str | list[str] = "Ryan",
+        instruct: str | list[str] = "",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
     ) -> RunResult:
         model_id_or_path = self._resolve_model(model, expected_kind="customvoice")
         params = {
