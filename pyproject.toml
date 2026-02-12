@@ -14,7 +14,7 @@ dependencies = [
   "pyyaml",
   "requests",
   "qwen-tts",
-  "huggingface-hub==0.36.0",
+  "huggingface-hub==1.4.1",
   "fastapi",
   "uvicorn[standard]",
   "pydantic",
