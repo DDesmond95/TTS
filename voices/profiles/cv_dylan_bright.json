@@ -1,0 +1,14 @@
+{
+  "id": "cv_dylan_bright",
+  "type": "customvoice",
+  "display_name": "Dylan (ZH 北京) - Bright & cheerful",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Dylan",
+    "instruct": "更明亮、更开心的语气，节奏略快一点，带一点笑意，但不要夸张。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

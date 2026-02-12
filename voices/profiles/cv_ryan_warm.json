@@ -1,0 +1,14 @@
+{
+    "id": "cv_ryan_warm",
+    "type": "customvoice",
+    "display_name": "Ryan (EN) - Warm & friendly",
+    "defaults": {
+        "language": "English",
+        "speaker": "Ryan",
+        "instruct": "Warm, friendly tone. Soft smile in the voice. Moderate pace. Clear articulation."
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

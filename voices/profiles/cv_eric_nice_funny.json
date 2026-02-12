@@ -1,0 +1,14 @@
+{
+  "id": "cv_eric_nice_funny",
+  "type": "customvoice",
+  "display_name": "Eric (ZH 四川) - Nice & playful",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Eric",
+    "instruct": "友善又有点俏皮的语气，节奏轻快，带笑意但不过度夸张。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

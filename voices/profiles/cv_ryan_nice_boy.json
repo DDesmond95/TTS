@@ -1,0 +1,14 @@
+{
+  "id": "cv_ryan_nice_boy",
+  "type": "customvoice",
+  "display_name": "Ryan (EN) - Nice & sweet",
+  "defaults": {
+    "language": "English",
+    "speaker": "Ryan",
+    "instruct": "Nice, sweet tone. Light warmth. Slightly playful but polite. Medium pace."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

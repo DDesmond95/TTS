@@ -1,0 +1,18 @@
+{
+  "id": "vd_male_cool_confident",
+  "type": "design_template",
+  "display_name": "VoiceDesign - Male cool & confident",
+  "defaults": {
+    "language": "English",
+    "speaker": "",
+    "instruct": ""
+  },
+  "design_template": {
+    "instruct_template": "Male voice, cool and confident, steady low-to-mid tone, minimal but intentional emotion, crisp pacing, clean consonants.",
+    "example_text": "Alright. I’ve got this. Follow me."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

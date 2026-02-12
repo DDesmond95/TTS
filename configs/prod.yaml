@@ -1,0 +1,13 @@
+runtime:
+  max_concurrent_jobs: 1
+  model_cache_size: 1
+  default_max_new_tokens: 1024
+  text_max_chars: 20000
+
+api:
+  cors_origins: []
+  api_key: null
+
+ui:
+  mode: api
+  api_url: http://api:8001

@@ -1,0 +1,20 @@
+{
+    "id": "clone_example",
+    "type": "clone",
+    "display_name": "Clone Example (fill refs)",
+    "defaults": {
+        "language": "English",
+        "speaker": "",
+        "instruct": ""
+    },
+    "clone": {
+        "ref_audio_path": "refs/clone_example.wav",
+        "ref_text_path": "refs/clone_example.txt",
+        "x_vector_only_mode": false,
+        "cached_prompt_path": "prompts/clone_example.prompt.pt"
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

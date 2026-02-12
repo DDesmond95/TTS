@@ -1,0 +1,14 @@
+{
+  "id": "cv_dylan_boyfriend",
+  "type": "customvoice",
+  "display_name": "Dylan (ZH 北京) - Soft boyfriend vibe",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Dylan",
+    "instruct": "轻声、亲近、带点宠溺的男友语气，语速稍慢，音量稍小，停顿自然。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

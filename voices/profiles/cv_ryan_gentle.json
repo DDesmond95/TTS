@@ -1,0 +1,14 @@
+{
+    "id": "cv_ryan_gentle",
+    "type": "customvoice",
+    "display_name": "Ryan (EN) - Gentle & comforting",
+    "defaults": {
+        "language": "English",
+        "speaker": "Ryan",
+        "instruct": "Gentle, comforting voice. Slightly slower pace. Smooth prosody. Low intensity."
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

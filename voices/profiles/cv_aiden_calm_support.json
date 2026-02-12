@@ -1,0 +1,14 @@
+{
+  "id": "cv_aiden_calm_support",
+  "type": "customvoice",
+  "display_name": "Aiden (EN) - Calm support",
+  "defaults": {
+    "language": "English",
+    "speaker": "Aiden",
+    "instruct": "Calm, supportive tone. Low intensity. Slow down slightly. Keep it steady and reassuring."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

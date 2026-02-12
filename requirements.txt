@@ -9,3 +9,14 @@ huggingface-hub==0.36.0
 numpy==1.26.4
 soundfile
 scipy
+
+# Server/UI/runtime
+fastapi
+uvicorn[standard]
+pydantic
+pyyaml
+requests
+gradio
+
+# Optional but strongly recommended for audio utilities and model IO
+ffmpeg-python

@@ -1,0 +1,14 @@
+{
+  "id": "cv_dylan_clean",
+  "type": "customvoice",
+  "display_name": "Dylan (ZH 北京) - Clean & natural",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Dylan",
+    "instruct": "自然清爽的青年男声，语速中等，语气亲和，表达清楚不做作。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

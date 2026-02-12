@@ -1,0 +1,14 @@
+{
+  "id": "cv_eric_warm",
+  "type": "customvoice",
+  "display_name": "Eric (ZH 四川) - Warm & lively",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Eric",
+    "instruct": "热情但不吵，声音偏温暖，语速中等，带一点轻松随和的感觉。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

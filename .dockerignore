@@ -1,0 +1,32 @@
+# VCS
+.git
+.gitlab
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist
+build
+
+# Jupyter
+.ipynb_checkpoints
+
+# Large assets / outputs
+models
+outputs/runs
+outputs/*.wav
+outputs/*.mp3
+voices/refs
+voices/prompts
+
+# Docs build artifacts (if you add them later)
+site
+htmlcov

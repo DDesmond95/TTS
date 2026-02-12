@@ -1,0 +1,18 @@
+{
+    "id": "design_template_radio_host",
+    "type": "design_template",
+    "display_name": "Radio Host (VoiceDesign template)",
+    "defaults": {
+        "language": "English",
+        "speaker": "",
+        "instruct": ""
+    },
+    "design_template": {
+        "instruct_template": "A professional radio host voice: clear articulation, confident mid-range tone, steady pace, friendly but authoritative.",
+        "example_text": "Good evening. Here’s today’s top story."
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

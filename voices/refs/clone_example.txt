@@ -1,0 +1,2 @@
+Replace this with the transcript of refs/clone_example.wav.
+Keep it verbatim to match what is spoken in the reference audio.

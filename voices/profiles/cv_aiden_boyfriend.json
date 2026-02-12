@@ -1,0 +1,14 @@
+{
+  "id": "cv_aiden_boyfriend",
+  "type": "customvoice",
+  "display_name": "Aiden (EN) - Soft boyfriend vibe",
+  "defaults": {
+    "language": "English",
+    "speaker": "Aiden",
+    "instruct": "Soft, affectionate boyfriend vibe. Intimate and reassuring. Slightly slower pace. Gentle emphasis."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

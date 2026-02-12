@@ -1,0 +1,18 @@
+{
+  "id": "vd_male_pretty_soft",
+  "type": "design_template",
+  "display_name": "VoiceDesign - Male pretty / soft (androgynous lean)",
+  "defaults": {
+    "language": "English",
+    "speaker": "",
+    "instruct": ""
+  },
+  "design_template": {
+    "instruct_template": "Male voice with a soft, pretty timbre; gentle brightness, light breathiness, calm cadence, emotionally tender but not exaggerated.",
+    "example_text": "It’s okay. I’ll stay with you a little longer."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

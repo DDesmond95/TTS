@@ -1,0 +1,14 @@
+{
+    "id": "customvoice_vivian",
+    "type": "customvoice",
+    "display_name": "Vivian (CustomVoice preset)",
+    "defaults": {
+        "language": "Chinese",
+        "speaker": "Vivian",
+        "instruct": ""
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

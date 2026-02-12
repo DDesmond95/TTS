@@ -1,2 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Outputs & assets
+outputs/runs/
+outputs/*.wav
+outputs/*.mp3
+voices/refs/*.wav
+voices/refs/*.mp3
+voices/prompts/*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+*.egg-info/
+
 models/
-*.wav

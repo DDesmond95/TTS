@@ -1,0 +1,65 @@
+stages:
+  - lint
+  - test
+  - build
+  - push
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_DRIVER: overlay2
+
+cache:
+  paths:
+    - .cache/pip
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - ruff check .
+    - ruff format --check .
+    - mypy src
+
+test:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -e ".[dev]"
+    - pytest -q
+
+docker_build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: "$CI_COMMIT_TAG"
+  script:
+    - docker version
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - export TAG="$CI_COMMIT_TAG"
+    - export IMAGE_API="$DOCKERHUB_USERNAME/qwen3-tts-api"
+    - export IMAGE_UI="$DOCKERHUB_USERNAME/qwen3-tts-ui"
+    - docker build -f docker/Dockerfile.api -t "$IMAGE_API:$TAG" -t "$IMAGE_API:latest" .
+    - docker build -f docker/Dockerfile.ui  -t "$IMAGE_UI:$TAG"  -t "$IMAGE_UI:latest"  .
+
+docker_push:
+  stage: push
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: "$CI_COMMIT_TAG"
+  script:
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - export TAG="$CI_COMMIT_TAG"
+    - export IMAGE_API="$DOCKERHUB_USERNAME/qwen3-tts-api"
+    - export IMAGE_UI="$DOCKERHUB_USERNAME/qwen3-tts-ui"
+    - docker push "$IMAGE_API:$TAG"
+    - docker push "$IMAGE_API:latest"
+    - docker push "$IMAGE_UI:$TAG"
+    - docker push "$IMAGE_UI:latest"

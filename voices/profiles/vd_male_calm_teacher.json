@@ -1,0 +1,18 @@
+{
+  "id": "vd_male_calm_teacher",
+  "type": "design_template",
+  "display_name": "VoiceDesign - Male calm teacher",
+  "defaults": {
+    "language": "English",
+    "speaker": "",
+    "instruct": ""
+  },
+  "design_template": {
+    "instruct_template": "Male teacher voice: calm, patient, measured pace, clear articulation, gentle emphasis on key concepts, reassuring and steady.",
+    "example_text": "Let’s go step by step. You’re doing fine."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

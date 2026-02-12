@@ -1,0 +1,14 @@
+{
+  "id": "cv_eric_soft",
+  "type": "customvoice",
+  "display_name": "Eric (ZH 四川) - Soft & sweet",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Eric",
+    "instruct": "更柔一点、更甜一点的语气，音量稍小，语速稍慢，听起来更亲近。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

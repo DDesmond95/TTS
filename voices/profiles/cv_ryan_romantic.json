@@ -1,0 +1,14 @@
+{
+    "id": "cv_ryan_romantic",
+    "type": "customvoice",
+    "display_name": "Ryan (EN) - Romantic & soft",
+    "defaults": {
+        "language": "English",
+        "speaker": "Ryan",
+        "instruct": "Soft romantic delivery, intimate and close-mic style. Slight breathiness. Lower volume, steady rhythm."
+    },
+    "meta": {
+        "created_at": "2026-02-12T00:00:00Z",
+        "updated_at": "2026-02-12T00:00:00Z"
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "cv_unclefu_gentle",
+  "type": "customvoice",
+  "display_name": "Uncle_Fu (ZH) - Gentle & comforting",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Uncle_Fu",
+    "instruct": "温柔、克制、很耐心的安慰语气。语速稍慢，停连自然，声音更柔和一点。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

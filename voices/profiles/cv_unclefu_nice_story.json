@@ -1,0 +1,14 @@
+{
+  "id": "cv_unclefu_nice_story",
+  "type": "customvoice",
+  "display_name": "Uncle_Fu (ZH) - Nice storyteller",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Uncle_Fu",
+    "instruct": "亲切耐听的讲故事语气，节奏舒缓，情绪温和，有陪伴感。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

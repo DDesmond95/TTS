@@ -1,3 +1,9 @@
 ipywidgets
 jupyter
 jupyterlab
+
+pytest
+ruff
+mypy
+types-PyYAML
+types-requests

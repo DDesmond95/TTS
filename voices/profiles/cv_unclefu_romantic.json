@@ -1,0 +1,14 @@
+{
+  "id": "cv_unclefu_romantic",
+  "type": "customvoice",
+  "display_name": "Uncle_Fu (ZH) - Deep romantic",
+  "defaults": {
+    "language": "Chinese",
+    "speaker": "Uncle_Fu",
+    "instruct": "低沉磁性的浪漫语气，靠近耳边说话的感觉，音量稍小，节奏更慢更稳。"
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

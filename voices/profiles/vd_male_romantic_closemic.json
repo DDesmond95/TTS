@@ -1,0 +1,18 @@
+{
+  "id": "vd_male_romantic_closemic",
+  "type": "design_template",
+  "display_name": "VoiceDesign - Male romantic close-mic",
+  "defaults": {
+    "language": "English",
+    "speaker": "",
+    "instruct": ""
+  },
+  "design_template": {
+    "instruct_template": "Male voice, romantic close-mic delivery, low volume, intimate whisper-adjacent tone (not fully whisper), steady pace, rich warmth.",
+    "example_text": "Come closer. I want to tell you something."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

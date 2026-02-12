@@ -13,6 +13,7 @@ set "ROOT=%CD%"
 
 call :pack "Qwen3-TTS\qwen_tts\core\models" "%OUT%"
 call :pack "Qwen3-TTS\qwen_tts\core\tokenizer_12hz" "%OUT%"
+call :pack "Qwen3-TTS\qwen_tts\inference" "%OUT%"
 
 
 echo Wrote: %OUT%

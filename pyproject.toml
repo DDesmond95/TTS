@@ -1,0 +1,70 @@
+[project]
+name = "qwen3-tts-platform"
+version = "0.1.0"
+description = "Local Qwen3-TTS platform: Python API + HTTP API + streaming transport + Web UI"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Your Name" }]
+
+dependencies = [
+  "numpy==1.26.4",
+  "soundfile",
+  "scipy",
+  "pyyaml",
+  "requests",
+  "qwen-tts",
+  "huggingface-hub==0.36.0",
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "gradio",
+]
+
+[project.optional-dependencies]
+api = [
+  "fastapi",
+  "uvicorn[standard]",
+]
+ui = [
+  "gradio",
+  "requests",
+]
+dev = [
+  "pytest",
+  "ruff",
+  "mypy",
+  "types-PyYAML",
+  "types-requests",
+  "jupyter",
+  "jupyterlab",
+  "ipywidgets",
+]
+
+[project.scripts]
+tts-platform = "tts_platform.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

@@ -1,0 +1,18 @@
+{
+  "id": "vd_male_warm_nice",
+  "type": "design_template",
+  "display_name": "VoiceDesign - Male warm & nice",
+  "defaults": {
+    "language": "English",
+    "speaker": "",
+    "instruct": ""
+  },
+  "design_template": {
+    "instruct_template": "Male voice, warm and kind, smooth mid-range, gentle confidence, slightly slower pace, intimate and comforting, clean articulation.",
+    "example_text": "Hey, you did well today. Take a breath—I'm here."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "cv_aiden_storyteller",
+  "type": "customvoice",
+  "display_name": "Aiden (EN) - Storyteller",
+  "defaults": {
+    "language": "English",
+    "speaker": "Aiden",
+    "instruct": "Storyteller voice. Dynamic but calm intonation. Comfortable pace. Warm, engaging narration."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}

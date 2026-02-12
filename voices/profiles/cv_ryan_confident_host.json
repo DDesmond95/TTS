@@ -1,0 +1,14 @@
+{
+  "id": "cv_ryan_confident_host",
+  "type": "customvoice",
+  "display_name": "Ryan (EN) - Confident host",
+  "defaults": {
+    "language": "English",
+    "speaker": "Ryan",
+    "instruct": "Confident host voice. Brighter energy. Crisp pacing. Professional and upbeat."
+  },
+  "meta": {
+    "created_at": "2026-02-12T14:38:06Z",
+    "updated_at": "2026-02-12T14:38:06Z"
+  }
+}
