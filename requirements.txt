@@ -6,7 +6,7 @@ torchaudio==2.2.2
 qwen-tts
 huggingface-hub==0.36.0
 
-numpy==1.26.4
+numpy==2.4.2
 soundfile
 scipy
 
