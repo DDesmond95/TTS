@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
-
 import yaml
 
 
@@ -26,7 +25,7 @@ class RuntimeConfig:
 class ApiConfig:
     host: str = "0.0.0.0"
     port: int = 8001
-    cors_origins: list[str] = None  # type: ignore
+    cors_origins: list[str] = field(default_factory=list)
     api_key: Optional[str] = None
 
 
@@ -123,10 +122,11 @@ def load_config(config_path: str | Path) -> AppConfig:
 
     paths = PathsConfig(**(data.get("paths") or {}), configs_dir=str(p.parent))
     runtime = RuntimeConfig(**(data.get("runtime") or {}))
-    api = ApiConfig(
-        cors_origins=(data.get("api") or {}).get("cors_origins", []) or [],
-        **(data.get("api") or {}),
-    )
+
+    api_dict = dict(data.get("api") or {})
+    cors = api_dict.pop("cors_origins", []) or []
+    api = ApiConfig(cors_origins=cors, **api_dict)
+
     ui = UiConfig(**(data.get("ui") or {}))
 
     return AppConfig(paths=paths, runtime=runtime, api=api, ui=ui)

@@ -30,7 +30,17 @@ def cmd_run_api(args: argparse.Namespace) -> None:
 def cmd_run_ui(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     demo = create_ui(cfg)
-    demo.queue(concurrency_count=1)  # keep GPU-safe by default
+
+    # Gradio queue API differs across versions; keep GPU-safe by default.
+    try:
+        demo.queue(default_concurrency_limit=1)
+    except TypeError:
+        try:
+            demo.queue(concurrency_count=1)
+        except TypeError:
+            # oldest gradio versions: queue() exists but may accept no args
+            demo.queue()
+
     demo.launch(
         server_name=args.host or cfg.ui.host, server_port=int(args.port or cfg.ui.port)
     )
