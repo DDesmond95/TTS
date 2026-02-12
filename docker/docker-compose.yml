@@ -3,42 +3,41 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    container_name: qwen3_tts_api
+    image: qwen3-tts-api:local
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../models:/app/models
+      - ../voices:/app/voices
+      - ../outputs:/app/outputs
+      - ../configs:/app/configs
     environment:
       - MODELS_DIR=/app/models
       - VOICES_DIR=/app/voices
       - OUTPUTS_DIR=/app/outputs
       - DEVICE=cuda:0
       - DTYPE=float16
-      - MAX_CONCURRENT_JOBS=1
-      - MODEL_CACHE_SIZE=1
-      - API_PORT=8001
-      # - API_KEY=change-me
-    volumes:
-      - ../models:/app/models
-      - ../voices:/app/voices
-      - ../outputs:/app/outputs
-      - ../configs:/app/configs
-    ports:
-      - "8001:8001"
-    # GPU runtime is host-specific; for modern Docker use:
-    # docker compose up --build (with NVIDIA container toolkit installed)
-    # and set deploy resources or use `--gpus all` depending on your setup.
+    # GPU (compose v2 supports this; requires NVIDIA Container Toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
 
   ui:
     build:
       context: ..
       dockerfile: docker/Dockerfile.ui
-    container_name: qwen3_tts_ui
-    environment:
-      - UI_PORT=7860
-      - UI_MODE=api
-      - API_URL=http://api:8001
-    volumes:
-      - ../configs:/app/configs
-      - ../outputs:/app/outputs
-      - ../voices:/app/voices
+    image: qwen3-tts-ui:local
     ports:
       - "7860:7860"
     depends_on:
       - api
+    volumes:
+      - ../models:/app/models
+      - ../voices:/app/voices
+      - ../outputs:/app/outputs
+      - ../configs:/app/configs
+    environment:
+      - UI_MODE=api
+      - API_URL=http://api:8001
