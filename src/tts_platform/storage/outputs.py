@@ -4,7 +4,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -13,9 +13,9 @@ import numpy as np
 class RunResult:
     run_id: str
     run_dir: Path
-    audio_path: Optional[Path]
-    sample_rate: Optional[int]
-    meta: Dict[str, Any]
+    audio_path: Path | None
+    sample_rate: int | None
+    meta: dict[str, Any]
 
 
 class OutputManager:
@@ -33,12 +33,12 @@ class OutputManager:
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_id, run_dir
 
-    def write_params(self, run_dir: Path, params: Dict[str, Any]) -> None:
+    def write_params(self, run_dir: Path, params: dict[str, Any]) -> None:
         (run_dir / "params.json").write_text(
             json.dumps(params, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
 
-    def write_meta(self, run_dir: Path, meta: Dict[str, Any]) -> None:
+    def write_meta(self, run_dir: Path, meta: dict[str, Any]) -> None:
         (run_dir / "meta.json").write_text(
             json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
@@ -52,3 +52,14 @@ class OutputManager:
         out = (run_dir / filename).resolve()
         sf.write(str(out), wav, sr)
         return out
+
+    def export_run(self, run_id: str, out_zip: Path) -> Path:
+        import zipfile
+        src = (self.runs_dir / run_id).resolve()
+        if not src.exists():
+            raise FileNotFoundError(f"Run {run_id} not found")
+
+        with zipfile.ZipFile(out_zip, "w") as z:
+            for f in src.rglob("*"):
+                z.write(f, arcname=f.relative_to(src.parent))
+        return out_zip

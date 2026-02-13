@@ -3,7 +3,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 DEFAULT_MODELS = [
     "Qwen/Qwen3-TTS-Tokenizer-12Hz",
@@ -81,7 +80,7 @@ def main() -> None:
     models_dir.mkdir(parents=True, exist_ok=True)
 
     if args.only:
-        model_ids: List[str] = list(args.only)
+        model_ids: list[str] = list(args.only)
     else:
         model_ids = list(DEFAULT_MODELS)
         if args.all or args.include_17b:

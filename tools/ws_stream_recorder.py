@@ -3,7 +3,6 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -11,10 +10,10 @@ import numpy as np
 async def run(ws_url: str, payload: dict, out_path: Path) -> None:
     try:
         import websockets  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: websockets. Install with: pip install websockets"
-        )
+        ) from None
 
     header = None
     chunks = []

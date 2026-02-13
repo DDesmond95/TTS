@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 
 import numpy as np
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -20,7 +20,7 @@ def get_engine() -> TTSEngine:
 router = APIRouter()
 
 
-async def _recv_start(ws: WebSocket) -> Dict[str, Any]:
+async def _recv_start(ws: WebSocket) -> dict[str, Any]:
     msg = await ws.receive_text()
     data = json.loads(msg)
     if data.get("type") != "start":
@@ -28,47 +28,77 @@ async def _recv_start(ws: WebSocket) -> Dict[str, Any]:
     return data
 
 
-async def _stream_pcm16(
-    ws: WebSocket, sr: int, wav: np.ndarray, chunk_ms: int, channels: int = 1
+async def _stream_iterator(
+    ws: WebSocket, gen: AsyncIterator[tuple[np.ndarray, int]], channels: int = 1
 ) -> None:
-    await ws.send_text(
-        json.dumps(
-            {
-                "type": "header",
-                "format": "pcm16",
-                "sample_rate": sr,
-                "channels": channels,
-            }
-        )
-    )
+    import asyncio
 
-    pcm = TTSEngine.wav_to_pcm16_bytes(wav)
-    bytes_per_sample = 2 * channels
-    samples_per_chunk = max(1, int(sr * (chunk_ms / 1000.0)))
-    bytes_per_chunk = samples_per_chunk * bytes_per_sample
+    header_sent = False
+    stop_requested = False
 
-    for i in range(0, len(pcm), bytes_per_chunk):
-        await ws.send_bytes(pcm[i : i + bytes_per_chunk])
+    # We need to run two things concurrently:
+    # 1. Pulling chunks from the engine (gen)
+    # 2. Listening for a "stop" message from the client
 
-    await ws.send_text(json.dumps({"type": "end", "ok": True}))
+    async def recv_loop():
+        nonlocal stop_requested
+        try:
+            async for msg in ws.iter_text():
+                data = json.loads(msg)
+                if data.get("type") == "stop":
+                    log.info("Client requested stream stop")
+                    stop_requested = True
+                    break
+        except Exception:
+            pass
+
+    recv_task = asyncio.create_task(recv_loop())
+
+    try:
+        async for wav, sr in gen:
+            if stop_requested:
+                break
+
+            if not header_sent:
+                await ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "header",
+                            "format": "pcm16",
+                            "sample_rate": sr,
+                            "channels": channels,
+                        }
+                    )
+                )
+                header_sent = True
+
+            pcm = TTSEngine.wav_to_pcm16_bytes(wav)
+            if pcm:
+                await ws.send_bytes(pcm)
+    finally:
+        recv_task.cancel()
+        try:
+            await recv_task
+        except asyncio.CancelledError:
+            pass
+
+    await ws.send_text(json.dumps({"type": "end", "ok": not stop_requested, "stopped": stop_requested}))
 
 
 @router.websocket("/ws/tts/custom_voice")
 async def ws_custom_voice(
-    ws: WebSocket, engine: TTSEngine = Depends(get_engine)
+    ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
     await ws.accept()
     try:
         start = await _recv_start(ws)
-        chunk_ms = int(start.get("chunk_ms", 60))
         text = start.get("text", "")
         language = start.get("language", "Auto")
         speaker = start.get("speaker", "Ryan")
         instruct = start.get("instruct", "")
         model = start.get("model")
 
-        # NOTE: This is "pseudo-streaming": generate first, then stream chunks.
-        res = await engine.run_custom_voice(
+        gen = engine.stream_custom_voice(
             text=text,
             language=language,
             speaker=speaker,
@@ -76,19 +106,7 @@ async def ws_custom_voice(
             model=model,
             gen={},
         )
-        audio_path = res.audio_path or (res.run_dir / "audio.wav")
-        import soundfile as sf
-
-        wav, sr = sf.read(str(audio_path), always_2d=False)
-        if isinstance(wav, np.ndarray) and wav.ndim == 2:
-            wav = np.mean(wav, axis=1)
-        await _stream_pcm16(
-            ws,
-            int(sr),
-            np.asarray(wav, dtype=np.float32),
-            chunk_ms=chunk_ms,
-            channels=1,
-        )
+        await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
         return
     except Exception as e:
@@ -99,33 +117,20 @@ async def ws_custom_voice(
 
 @router.websocket("/ws/tts/voice_design")
 async def ws_voice_design(
-    ws: WebSocket, engine: TTSEngine = Depends(get_engine)
+    ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
     await ws.accept()
     try:
         start = await _recv_start(ws)
-        chunk_ms = int(start.get("chunk_ms", 60))
         text = start.get("text", "")
         language = start.get("language", "Auto")
         instruct = start.get("instruct", "")
         model = start.get("model")
 
-        res = await engine.run_voice_design(
+        gen = engine.stream_voice_design(
             text=text, language=language, instruct=instruct, model=model, gen={}
         )
-        audio_path = res.audio_path or (res.run_dir / "audio.wav")
-        import soundfile as sf
-
-        wav, sr = sf.read(str(audio_path), always_2d=False)
-        if isinstance(wav, np.ndarray) and wav.ndim == 2:
-            wav = np.mean(wav, axis=1)
-        await _stream_pcm16(
-            ws,
-            int(sr),
-            np.asarray(wav, dtype=np.float32),
-            chunk_ms=chunk_ms,
-            channels=1,
-        )
+        await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
         return
     except Exception as e:
@@ -136,12 +141,11 @@ async def ws_voice_design(
 
 @router.websocket("/ws/tts/voice_clone")
 async def ws_voice_clone(
-    ws: WebSocket, engine: TTSEngine = Depends(get_engine)
+    ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
     await ws.accept()
     try:
         start = await _recv_start(ws)
-        chunk_ms = int(start.get("chunk_ms", 60))
         text = start.get("text", "")
         language = start.get("language", "Auto")
         model = start.get("model")
@@ -152,7 +156,7 @@ async def ws_voice_clone(
         x_vector_only_mode = bool(start.get("x_vector_only_mode", False))
         use_cached_prompt = bool(start.get("use_cached_prompt", True))
 
-        res = await engine.run_voice_clone(
+        gen = engine.stream_voice_clone(
             text=text,
             language=language,
             voice_profile=voice_profile,
@@ -163,19 +167,7 @@ async def ws_voice_clone(
             use_cached_prompt=use_cached_prompt,
             gen={},
         )
-        audio_path = res.audio_path or (res.run_dir / "audio.wav")
-        import soundfile as sf
-
-        wav, sr = sf.read(str(audio_path), always_2d=False)
-        if isinstance(wav, np.ndarray) and wav.ndim == 2:
-            wav = np.mean(wav, axis=1)
-        await _stream_pcm16(
-            ws,
-            int(sr),
-            np.asarray(wav, dtype=np.float32),
-            chunk_ms=chunk_ms,
-            channels=1,
-        )
+        await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
         return
     except Exception as e:

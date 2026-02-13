@@ -2,7 +2,7 @@
 
 Pipelines are higher-level workflows composed of tasks plus text/audio utilities.
 
-## Long-form narration
+## Long-form narration (Implemented)
 
 Purpose:
 
@@ -19,7 +19,7 @@ Outputs:
 - one merged WAV
 - per-chunk artifacts (optional)
 
-## Audiobook / web-novel
+## Audiobook / web-novel (Implemented)
 
 Inputs:
 
@@ -31,7 +31,7 @@ Features:
 - per-chapter exports
 - optional full-book merge
 
-## Script / table-read
+## Script / table-read (Implemented)
 
 Inputs:
 
@@ -43,7 +43,7 @@ Features:
 - generate line-by-line
 - optional per-scene merge
 
-## NPC pack generator
+## NPC pack generator (Implemented)
 
 Inputs:
 
@@ -55,7 +55,7 @@ Outputs:
 - folder per character
 - manifest json for integration
 
-## Subtitle-to-speech (SRT/VTT)
+## Subtitle-to-speech (SRT/VTT) (Implemented)
 
 Inputs:
 

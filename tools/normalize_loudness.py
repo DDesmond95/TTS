@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 
 
-def load_mono(path: Path) -> Tuple[np.ndarray, int]:
+def load_mono(path: Path) -> tuple[np.ndarray, int]:
     import soundfile as sf
 
     x, sr = sf.read(str(path), always_2d=False)

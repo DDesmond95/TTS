@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import platform
 import sys
-from typing import Any, Dict
 
 
 def main() -> None:

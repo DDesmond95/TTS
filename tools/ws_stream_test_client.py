@@ -3,16 +3,15 @@ import argparse
 import asyncio
 import json
 import time
-from typing import Optional
 
 
 async def run(ws_url: str, payload: dict, max_seconds: int = 60) -> None:
     try:
         import websockets  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: websockets. Install with: pip install websockets"
-        )
+        ) from None
 
     t0 = time.time()
     header = None

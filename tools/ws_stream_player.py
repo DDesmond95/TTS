@@ -3,41 +3,38 @@ import argparse
 import asyncio
 import json
 import time
-from typing import List, Optional
-
-import numpy as np
 
 
 def list_devices() -> None:
     try:
         import sounddevice as sd  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: sounddevice. Install with: pip install sounddevice"
-        )
+        ) from None
     devices = sd.query_devices()
     for i, d in enumerate(devices):
         print(f"{i:3d}: {d['name']} (max_out={d['max_output_channels']})")
 
 
 async def run(
-    ws_url: str, payload: dict, device: Optional[str], buffer_ms: int
+    ws_url: str, payload: dict, device: str | None, buffer_ms: int
 ) -> None:
     try:
         import websockets  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: websockets. Install with: pip install websockets"
-        )
+        ) from None
     try:
         import sounddevice as sd  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: sounddevice. Install with: pip install sounddevice"
-        )
+        ) from None
 
     header = None
-    q: List[bytes] = []
+    q: list[bytes] = []
     started = False
     start_play_time = None
 

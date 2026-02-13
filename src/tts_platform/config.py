@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+
 import yaml
 
 
@@ -18,7 +19,7 @@ class RuntimeConfig:
     default_temperature: float = 0.8
     text_max_chars: int = 20000
     upload_max_mb: int = 50
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 @dataclass
@@ -26,7 +27,7 @@ class ApiConfig:
     host: str = "0.0.0.0"
     port: int = 8001
     cors_origins: list[str] = field(default_factory=list)
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
 
 @dataclass
@@ -53,7 +54,7 @@ class AppConfig:
     ui: UiConfig
 
 
-def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+def _deep_merge(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     out = dict(a)
     for k, v in b.items():
         if k in out and isinstance(out[k], dict) and isinstance(v, dict):
@@ -63,7 +64,7 @@ def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _apply_env_overrides(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_env_overrides(cfg: dict[str, Any]) -> dict[str, Any]:
     # Paths
     cfg.setdefault("paths", {})
     cfg["paths"]["models_dir"] = os.getenv(

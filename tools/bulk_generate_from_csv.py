@@ -4,7 +4,7 @@ import csv
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
@@ -32,7 +32,7 @@ def main() -> None:
     endpoint = api_url + TASK_TO_ENDPOINT[args.task]
 
     rows = []
-    with open(args.csv, "r", encoding="utf-8") as f:
+    with open(args.csv, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for r in reader:
             if "text" not in r:
@@ -44,7 +44,7 @@ def main() -> None:
 
     with out_path.open("w", encoding="utf-8") as out:
         for i, r in enumerate(rows):
-            payload: Dict[str, Any] = {}
+            payload: dict[str, Any] = {}
             payload["text"] = r["text"]
             payload["language"] = r.get("language") or args.default_language
             payload["speaker"] = r.get("speaker") or args.default_speaker

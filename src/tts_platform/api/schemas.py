@@ -1,8 +1,20 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
+
+from ..pipelines.audiobook import AudiobookRequest
+from ..pipelines.long_form import LongFormRequest
+from ..pipelines.npc_pack import NPCPackRequest
+from ..pipelines.script_read import ScriptReadRequest
+from ..pipelines.subtitles import SubtitlesRequest
+from ..tasks.custom_voice import CustomVoiceRequest
+from ..tasks.design_then_clone import DesignThenCloneRequest
+from ..tasks.tokenizer import TokenizerDecodeRequest, TokenizerEncodeRequest
+from ..tasks.voice_clone import VoiceCloneRequest
+from ..tasks.voice_design import VoiceDesignRequest
+from ..voices.schema import VoiceProfile
 
 
 class WarmupRequest(BaseModel):
@@ -11,58 +23,25 @@ class WarmupRequest(BaseModel):
 
 class RunResponse(BaseModel):
     run_id: str
-    sample_rate: Optional[int] = None
-    audio_url: Optional[str] = None
+    sample_rate: int | None = None
+    audio_url: str | None = None
     run_dir: str
-    meta: Dict[str, Any] = Field(default_factory=dict)
+    meta: dict[str, Any] = Field(default_factory=dict)
 
-
-class CustomVoiceRequest(BaseModel):
-    text: Union[str, List[str]]
-    language: Union[str, List[str]] = "Auto"
-    speaker: Union[str, List[str]] = "Ryan"
-    instruct: Union[str, List[str]] = ""
-    model: Optional[str] = None
-    gen: Dict[str, Any] = Field(default_factory=dict)
-
-
-class VoiceDesignRequest(BaseModel):
-    text: Union[str, List[str]]
-    language: Union[str, List[str]] = "Auto"
-    instruct: Union[str, List[str]] = ""
-    model: Optional[str] = None
-    gen: Dict[str, Any] = Field(default_factory=dict)
-
-
-class VoiceCloneRequest(BaseModel):
-    text: Union[str, List[str]]
-    language: Union[str, List[str]] = "Auto"
-    voice_profile: Optional[str] = None
-    ref_audio: Optional[str] = None
-    ref_text: Optional[str] = None
-    model: Optional[str] = None
-    x_vector_only_mode: bool = False
-    use_cached_prompt: bool = True
-    gen: Dict[str, Any] = Field(default_factory=dict)
-
-
-class DesignThenCloneRequest(BaseModel):
-    design_text: str
-    design_language: str = "Auto"
-    design_instruct: str = ""
-    clone_text: Union[str, List[str]]
-    clone_language: Union[str, List[str]] = "Auto"
-    voicedesign_model: Optional[str] = None
-    base_model: Optional[str] = None
-    gen_design: Dict[str, Any] = Field(default_factory=dict)
-    gen_clone: Dict[str, Any] = Field(default_factory=dict)
-
-
-class TokenizerEncodeRequest(BaseModel):
-    audio: str
-    model: Optional[str] = None
-
-
-class TokenizerDecodeRequest(BaseModel):
-    codes_json_path: str
-    model: Optional[str] = None
+# Re-exporting
+__all__ = [
+    "WarmupRequest",
+    "RunResponse",
+    "CustomVoiceRequest",
+    "VoiceDesignRequest",
+    "VoiceCloneRequest",
+    "DesignThenCloneRequest",
+    "TokenizerEncodeRequest",
+    "TokenizerDecodeRequest",
+    "LongFormRequest",
+    "NPCPackRequest",
+    "ScriptReadRequest",
+    "SubtitlesRequest",
+    "AudiobookRequest",
+    "VoiceProfile",
+]

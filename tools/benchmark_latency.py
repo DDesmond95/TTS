@@ -4,16 +4,15 @@ import asyncio
 import json
 import time
 from statistics import mean, median
-from typing import List, Optional, Tuple
 
 
-async def one_run(ws_url: str, payload: dict) -> Tuple[float, float]:
+async def one_run(ws_url: str, payload: dict) -> tuple[float, float]:
     try:
         import websockets  # type: ignore
-    except Exception:
+    except ImportError:
         raise SystemExit(
             "Missing dependency: websockets. Install with: pip install websockets"
-        )
+        ) from None
 
     t0 = time.time()
     t_first = None
@@ -58,8 +57,8 @@ def main() -> None:
         "chunk_ms": args.chunk_ms,
     }
 
-    ttfa: List[float] = []
-    total: List[float] = []
+    ttfa: list[float] = []
+    total: list[float] = []
     for i in range(args.runs):
         a, b = asyncio.run(one_run(args.ws_url, payload))
         ttfa.append(a)

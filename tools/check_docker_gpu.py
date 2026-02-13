@@ -13,7 +13,7 @@ def main() -> None:
     try:
         subprocess.check_call(["nvidia-smi"], stdout=sys.stdout, stderr=sys.stderr)
     except Exception as e:
-        raise SystemExit(f"nvidia-smi not working: {e}")
+        raise SystemExit(f"nvidia-smi not working: {e}") from None
 
     print("\n[host] checking docker")
     try:
@@ -21,7 +21,7 @@ def main() -> None:
             ["docker", "version"], stdout=sys.stdout, stderr=sys.stderr
         )
     except Exception as e:
-        raise SystemExit(f"docker not working: {e}")
+        raise SystemExit(f"docker not working: {e}") from None
 
     print("\n[host] checking docker --gpus all (requires NVIDIA Container Toolkit)")
     cmd = [
@@ -40,7 +40,7 @@ def main() -> None:
         raise SystemExit(
             "docker GPU access failed. Ensure NVIDIA Container Toolkit is installed and your docker daemon is configured.\n"
             f"error: {e}"
-        )
+        ) from None
 
 
 if __name__ == "__main__":

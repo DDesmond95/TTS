@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 ALLOWED_TYPES = {"customvoice", "clone", "design_template"}
 
 
-def _load_json(p: Path) -> Dict[str, Any]:
+def _load_json(p: Path) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def _validate_common(d: Dict[str, Any], p: Path) -> None:
+def _validate_common(d: dict[str, Any], p: Path) -> None:
     assert isinstance(d.get("id"), str) and d["id"], f"{p}: missing/invalid id"
     assert (
         isinstance(d.get("type"), str) and d["type"] in ALLOWED_TYPES
@@ -37,7 +37,7 @@ def _validate_common(d: Dict[str, Any], p: Path) -> None:
     ), f"{p}: meta.updated_at missing"
 
 
-def _validate_customvoice(d: Dict[str, Any], p: Path) -> None:
+def _validate_customvoice(d: dict[str, Any], p: Path) -> None:
     defaults = d["defaults"]
     assert (
         isinstance(defaults.get("speaker"), str) and defaults["speaker"]
@@ -48,7 +48,7 @@ def _validate_customvoice(d: Dict[str, Any], p: Path) -> None:
     ), f"{p}: customvoice must not contain design_template section"
 
 
-def _validate_clone(d: Dict[str, Any], p: Path) -> None:
+def _validate_clone(d: dict[str, Any], p: Path) -> None:
     clone = d.get("clone")
     assert isinstance(clone, dict), f"{p}: clone section required for clone type"
     assert (
@@ -74,7 +74,7 @@ def _validate_clone(d: Dict[str, Any], p: Path) -> None:
     ), f"{p}: clone must not contain design_template section"
 
 
-def _validate_design_template(d: Dict[str, Any], p: Path) -> None:
+def _validate_design_template(d: dict[str, Any], p: Path) -> None:
     dt = d.get("design_template")
     assert isinstance(
         dt, dict

@@ -19,7 +19,7 @@ class Paths:
         voices_dir: str,
         outputs_dir: str,
         configs_dir: str,
-    ) -> "Paths":
+    ) -> Paths:
         rr = repo_root.resolve()
         return Paths(
             repo_root=rr,

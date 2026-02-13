@@ -2,7 +2,6 @@
 import argparse
 import os
 import time
-from pathlib import Path
 
 
 def warmup_local(model_id_or_path: str, task: str) -> None:

@@ -3,15 +3,14 @@ import argparse
 import os
 import re
 from pathlib import Path
-from typing import List, Tuple
 
 import requests
 
 
-def parse_srt(text: str) -> List[str]:
+def parse_srt(text: str) -> list[str]:
     # Minimal SRT parsing: extract caption text blocks
     blocks = re.split(r"\n\s*\n", text.strip(), flags=re.MULTILINE)
-    lines: List[str] = []
+    lines: list[str] = []
     for b in blocks:
         parts = b.strip().splitlines()
         if len(parts) < 3:

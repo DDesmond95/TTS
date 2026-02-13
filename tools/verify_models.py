@@ -2,7 +2,6 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 REQUIRED_SUBDIRS = [
     "Qwen3-TTS-Tokenizer-12Hz",
@@ -50,8 +49,8 @@ def main() -> None:
     print(f"[info] models_dir = {models_dir}")
 
     required = REQUIRED_SUBDIRS + (OPTIONAL_SUBDIRS if args.require_17b else [])
-    missing: List[str] = []
-    present: List[Tuple[str, str]] = []
+    missing: list[str] = []
+    present: list[tuple[str, str]] = []
 
     for name in required:
         d = models_dir / name

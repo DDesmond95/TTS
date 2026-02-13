@@ -2,12 +2,11 @@
 import argparse
 import math
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 
 
-def _load_audio(path: Path) -> Tuple[np.ndarray, int]:
+def _load_audio(path: Path) -> tuple[np.ndarray, int]:
     import soundfile as sf
 
     data, sr = sf.read(str(path), always_2d=True)

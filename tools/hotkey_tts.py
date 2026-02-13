@@ -2,8 +2,6 @@
 import argparse
 import asyncio
 import json
-import sys
-from typing import Optional
 
 
 def _get_clipboard_text() -> str:
@@ -18,17 +16,17 @@ def _get_clipboard_text() -> str:
 
 
 async def speak_once(
-    ws_url: str, payload: dict, device: Optional[str], buffer_ms: int
+    ws_url: str, payload: dict, device: str | None, buffer_ms: int
 ) -> None:
     # Reuse ws_stream_player core logic by importing it is not allowed (tools should be standalone).
     # Minimal embedded player:
     try:
         import sounddevice as sd  # type: ignore
         import websockets  # type: ignore
-    except Exception as e:
+    except ImportError:
         raise SystemExit(
             "Missing dependencies: websockets and sounddevice. Install with: pip install websockets sounddevice"
-        )
+        ) from None
 
     header = None
     q = []

@@ -15,8 +15,8 @@ def main() -> None:
 
     try:
         import torch
-    except Exception as e:
-        raise SystemExit(f"torch is required: {e}")
+    except ImportError as e:
+        raise SystemExit(f"torch is required: {e}") from None
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA not available. VRAM profiling requires a GPU.")

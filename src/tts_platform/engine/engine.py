@@ -3,16 +3,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import OrderedDict
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import numpy as np
 
 from ..config import RuntimeConfig
 from ..models.registry import ModelRegistry
+from ..storage.outputs import OutputManager, RunResult
 from ..voices.store import VoiceStore
-from .outputs import OutputManager, RunResult
 
 log = logging.getLogger("tts_platform.engine")
 
@@ -58,6 +59,22 @@ class TTSEngine:
         for v in self.voices.list_profiles():
             out.append({"id": v.id, "type": v.type, "display_name": v.display_name})
         return out
+
+    def save_voice(self, voice_id: str, profile_data: dict) -> None:
+        from ..voices.schema import VoiceProfile
+        profile = VoiceProfile.model_validate(profile_data)
+        self.voices.save(voice_id, profile)
+
+    def delete_voice(self, voice_id: str) -> bool:
+        return self.voices.delete(voice_id)
+
+    def export_voice(self, voice_id: str) -> Path:
+        run_id, run_dir = self.outputs.new_run_dir("export")
+        zip_path = run_dir / f"{voice_id}.zip"
+        return self.voices.export_pack(voice_id, zip_path)
+
+    def import_voice(self, zip_path: str | Path) -> str:
+        return self.voices.import_pack(Path(zip_path))
 
     def _device_dtype(self) -> tuple[str, Any]:
         import torch
@@ -168,413 +185,279 @@ class TTSEngine:
         model: str | None = None,
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
-        model_id_or_path = self._resolve_model(model, expected_kind="customvoice")
-        params = {
-            "task": "custom_voice",
-            "model": model_id_or_path,
-            "text": text,
-            "language": language,
-            "speaker": speaker,
-            "instruct": instruct,
-            "gen": gen or {},
-        }
-        run_id, run_dir = self.outputs.new_run_dir("custom_voice")
-        self.outputs.write_params(run_dir, params)
-
-        async with self._sem:
-            model_obj = await asyncio.to_thread(
-                self._get_or_load, model_id_or_path, "customvoice"
-            )
-            wavs, sr = await asyncio.to_thread(
-                model_obj.generate_custom_voice,
-                text=text,
-                language=language,
-                speaker=speaker,
-                instruct=instruct,
-                **(gen or {}),
-            )
-
-        # qwen-tts returns list of wav arrays
-        audio_paths = []
-        for i, w in enumerate(wavs):
-            audio_paths.append(
-                self.outputs.save_wav(
-                    run_dir, np.asarray(w), int(sr), filename=f"audio_{i}.wav"
-                )
-            )
-
-        meta = {
-            "sample_rate": int(sr),
-            "count": len(audio_paths),
-            "files": [p.name for p in audio_paths],
-        }
-        self.outputs.write_meta(run_dir, meta)
-
-        # convenience: if single, also write audio.wav
-        audio_path = None
-        if len(audio_paths) == 1:
-            audio_path = audio_paths[0]
-            # alias
-            if audio_path.name != "audio.wav":
-                (run_dir / "audio.wav").write_bytes(audio_path.read_bytes())
-                audio_path = (run_dir / "audio.wav").resolve()
-
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
+        from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+        task = CustomVoiceTask()
+        req = CustomVoiceRequest(
+            text=text,
+            language=language,
+            speaker=speaker,
+            instruct=instruct,
+            model=model,
+            gen=gen or {},
         )
+        return await task.run(self, req)
 
     async def run_voice_design(
         self,
-        text: Union[str, List[str]],
-        language: Union[str, List[str]] = "Auto",
-        instruct: Union[str, List[str]] = "",
-        model: Optional[str] = None,
-        gen: Optional[Dict[str, Any]] = None,
+        text: str | list[str],
+        language: str | list[str] = "Auto",
+        instruct: str | list[str] = "",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
     ) -> RunResult:
-        model_id_or_path = self._resolve_model(model, expected_kind="voicedesign")
-        params = {
-            "task": "voice_design",
-            "model": model_id_or_path,
-            "text": text,
-            "language": language,
-            "instruct": instruct,
-            "gen": gen or {},
-        }
-        run_id, run_dir = self.outputs.new_run_dir("voice_design")
-        self.outputs.write_params(run_dir, params)
-
-        async with self._sem:
-            model_obj = await asyncio.to_thread(
-                self._get_or_load, model_id_or_path, "voicedesign"
-            )
-            wavs, sr = await asyncio.to_thread(
-                model_obj.generate_voice_design,
-                text=text,
-                language=language,
-                instruct=instruct,
-                **(gen or {}),
-            )
-
-        audio_paths = []
-        for i, w in enumerate(wavs):
-            audio_paths.append(
-                self.outputs.save_wav(
-                    run_dir, np.asarray(w), int(sr), filename=f"audio_{i}.wav"
-                )
-            )
-
-        meta = {
-            "sample_rate": int(sr),
-            "count": len(audio_paths),
-            "files": [p.name for p in audio_paths],
-        }
-        self.outputs.write_meta(run_dir, meta)
-
-        audio_path = None
-        if len(audio_paths) == 1:
-            audio_path = audio_paths[0]
-            if audio_path.name != "audio.wav":
-                (run_dir / "audio.wav").write_bytes(audio_path.read_bytes())
-                audio_path = (run_dir / "audio.wav").resolve()
-
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
+        from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
+        task = VoiceDesignTask()
+        req = VoiceDesignRequest(
+            text=text,
+            language=language,
+            instruct=instruct,
+            model=model,
+            gen=gen or {},
         )
+        return await task.run(self, req)
 
     async def run_voice_clone(
         self,
-        text: Union[str, List[str]],
-        language: Union[str, List[str]] = "Auto",
-        ref_audio: Optional[str] = None,
-        ref_text: Optional[str] = None,
-        voice_profile: Optional[str] = None,
-        model: Optional[str] = None,
+        text: str | list[str],
+        language: str | list[str] = "Auto",
+        ref_audio: str | None = None,
+        ref_text: str | None = None,
+        voice_profile: str | None = None,
+        model: str | None = None,
         x_vector_only_mode: bool = False,
         use_cached_prompt: bool = True,
-        gen: Optional[Dict[str, Any]] = None,
+        gen: dict[str, Any] | None = None,
     ) -> RunResult:
-        model_id_or_path = self._resolve_model(model, expected_kind="base")
-        run_id, run_dir = self.outputs.new_run_dir("voice_clone")
-
-        # resolve via voice profile if provided
-        cached_prompt = None
-        if voice_profile:
-            prof = self.voices.get(voice_profile)
-            if not prof:
-                raise ValueError(f"Voice profile not found: {voice_profile}")
-            if prof.type != "clone" or not prof.clone:
-                raise ValueError(
-                    f"Voice profile is not a clone profile: {voice_profile}"
-                )
-
-            if not ref_audio:
-                ref_audio = prof.clone.ref_audio_path
-            if not ref_text and prof.clone.ref_text_path:
-                ref_text = prof.clone.ref_text_path
-            x_vector_only_mode = (
-                bool(prof.clone.x_vector_only_mode)
-                if prof.clone
-                else x_vector_only_mode
-            )
-
-            if use_cached_prompt and prof.clone and prof.clone.cached_prompt_path:
-                import torch
-
-                prompt_path = self.voices.resolve_path(prof.clone.cached_prompt_path)
-                if prompt_path.exists():
-                    cached_prompt = torch.load(str(prompt_path), map_location="cpu")
-
-        # resolve actual paths if they are voice-relative
-        ref_audio_resolved = (
-            self.voices.resolve_path(ref_audio).as_posix() if ref_audio else None
+        from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+        task = VoiceCloneTask()
+        req = VoiceCloneRequest(
+            text=text,
+            language=language,
+            ref_audio=ref_audio,
+            ref_text=ref_text,
+            voice_profile=voice_profile,
+            model=model,
+            x_vector_only_mode=x_vector_only_mode,
+            use_cached_prompt=use_cached_prompt,
+            gen=gen or {},
         )
-        ref_text_str = None
-        if ref_text and not x_vector_only_mode:
-            rt = self.voices.resolve_path(ref_text)
-            ref_text_str = rt.read_text(encoding="utf-8").strip()
-
-        params = {
-            "task": "voice_clone",
-            "model": model_id_or_path,
-            "text": text,
-            "language": language,
-            "voice_profile": voice_profile,
-            "ref_audio": ref_audio,
-            "ref_text": ref_text,
-            "x_vector_only_mode": x_vector_only_mode,
-            "use_cached_prompt": use_cached_prompt,
-            "gen": gen or {},
-        }
-        self.outputs.write_params(run_dir, params)
-
-        async with self._sem:
-            model_obj = await asyncio.to_thread(
-                self._get_or_load, model_id_or_path, "base"
-            )
-
-            if cached_prompt is not None:
-                wavs, sr = await asyncio.to_thread(
-                    model_obj.generate_voice_clone,
-                    text=text,
-                    language=language,
-                    voice_clone_prompt=cached_prompt,
-                    **(gen or {}),
-                )
-            else:
-                if not ref_audio_resolved:
-                    raise ValueError(
-                        "ref_audio is required (or set voice_profile with ref_audio_path)"
-                    )
-                wavs, sr = await asyncio.to_thread(
-                    model_obj.generate_voice_clone,
-                    text=text,
-                    language=language,
-                    ref_audio=ref_audio_resolved,
-                    ref_text=ref_text_str,
-                    x_vector_only_mode=x_vector_only_mode,
-                    **(gen or {}),
-                )
-
-        audio_paths = []
-        for i, w in enumerate(wavs):
-            audio_paths.append(
-                self.outputs.save_wav(
-                    run_dir, np.asarray(w), int(sr), filename=f"audio_{i}.wav"
-                )
-            )
-
-        meta = {
-            "sample_rate": int(sr),
-            "count": len(audio_paths),
-            "files": [p.name for p in audio_paths],
-        }
-        self.outputs.write_meta(run_dir, meta)
-
-        audio_path = None
-        if len(audio_paths) == 1:
-            audio_path = audio_paths[0]
-            if audio_path.name != "audio.wav":
-                (run_dir / "audio.wav").write_bytes(audio_path.read_bytes())
-                audio_path = (run_dir / "audio.wav").resolve()
-
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
-        )
+        return await task.run(self, req)
 
     async def run_design_then_clone(
         self,
         design_text: str,
         design_language: str,
         design_instruct: str,
-        clone_text: Union[str, List[str]],
-        clone_language: Union[str, List[str]] = "Auto",
-        voicedesign_model: Optional[str] = None,
-        base_model: Optional[str] = None,
-        gen_design: Optional[Dict[str, Any]] = None,
-        gen_clone: Optional[Dict[str, Any]] = None,
+        clone_text: str | list[str],
+        clone_language: str | list[str] = "Auto",
+        voicedesign_model: str | None = None,
+        base_model: str | None = None,
+        gen_design: dict[str, Any] | None = None,
+        gen_clone: dict[str, Any] | None = None,
     ) -> RunResult:
-        # step 1: design a reference
-        design_res = await self.run_voice_design(
-            text=design_text,
-            language=design_language,
-            instruct=design_instruct,
-            model=voicedesign_model,
-            gen=gen_design,
+        from ..tasks.design_then_clone import DesignThenCloneRequest, DesignThenCloneTask
+        task = DesignThenCloneTask()
+        req = DesignThenCloneRequest(
+            design_text=design_text,
+            design_language=design_language,
+            design_instruct=design_instruct,
+            clone_text=clone_text,
+            clone_language=clone_language,
+            voicedesign_model=voicedesign_model,
+            base_model=base_model,
+            gen_design=gen_design or {},
+            gen_clone=gen_clone or {},
         )
-
-        # step 2: build clone prompt (in-memory) and then clone
-        import torch
-        from qwen_tts import Qwen3TTSModel
-
-        base_id_or_path = self._resolve_model(base_model, expected_kind="base")
-        device, torch_dtype = self._device_dtype()
-
-        async with self._sem:
-            base_obj = await asyncio.to_thread(
-                self._get_or_load, base_id_or_path, "base"
-            )
-
-            # load the design wav (single file expectation)
-            if not design_res.audio_path:
-                raise RuntimeError("design step did not produce audio.wav")
-
-            prompt_items = await asyncio.to_thread(
-                base_obj.create_voice_clone_prompt,
-                ref_audio=str(design_res.audio_path),
-                ref_text=design_text,
-                x_vector_only_mode=False,
-            )
-
-            # clone using prompt
-            wavs, sr = await asyncio.to_thread(
-                base_obj.generate_voice_clone,
-                text=clone_text,
-                language=clone_language,
-                voice_clone_prompt=prompt_items,
-                **(gen_clone or {}),
-            )
-
-        # store under a new run
-        run_id, run_dir = self.outputs.new_run_dir("design_then_clone")
-        self.outputs.write_params(
-            run_dir,
-            {
-                "task": "design_then_clone",
-                "voicedesign_run_id": design_res.run_id,
-                "voicedesign_model": voicedesign_model,
-                "base_model": base_id_or_path,
-                "design_text": design_text,
-                "design_language": design_language,
-                "design_instruct": design_instruct,
-                "clone_text": clone_text,
-                "clone_language": clone_language,
-                "gen_design": gen_design or {},
-                "gen_clone": gen_clone or {},
-            },
-        )
-
-        audio_paths = []
-        for i, w in enumerate(wavs):
-            audio_paths.append(
-                self.outputs.save_wav(
-                    run_dir, np.asarray(w), int(sr), filename=f"audio_{i}.wav"
-                )
-            )
-
-        meta = {
-            "sample_rate": int(sr),
-            "count": len(audio_paths),
-            "files": [p.name for p in audio_paths],
-        }
-        self.outputs.write_meta(run_dir, meta)
-
-        audio_path = None
-        if len(audio_paths) == 1:
-            audio_path = audio_paths[0]
-            if audio_path.name != "audio.wav":
-                (run_dir / "audio.wav").write_bytes(audio_path.read_bytes())
-                audio_path = (run_dir / "audio.wav").resolve()
-
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
-        )
+        return await task.run(self, req)
 
     async def tokenizer_encode(
-        self, audio: str, model: Optional[str] = None
+        self, audio: str, model: str | None = None
     ) -> RunResult:
-        model_id_or_path = self._resolve_model(model, expected_kind="tokenizer")
-        run_id, run_dir = self.outputs.new_run_dir("tokenizer_encode")
-        params = {"task": "tokenizer_encode", "model": model_id_or_path, "audio": audio}
-        self.outputs.write_params(run_dir, params)
-
-        async with self._sem:
-            tok = await asyncio.to_thread(
-                self._get_or_load, model_id_or_path, "tokenizer"
-            )
-            enc = await asyncio.to_thread(tok.encode, audio)
-
-        # store encoded payload
-        out = (run_dir / "codes.json").resolve()
-        import json
-
-        out.write_text(json.dumps(enc, ensure_ascii=False) + "\n", encoding="utf-8")
-        meta = {"codes_path": out.name}
-        self.outputs.write_meta(run_dir, meta)
-        return RunResult(
-            run_id=run_id, run_dir=run_dir, audio_path=None, sample_rate=None, meta=meta
-        )
+        from ..tasks.tokenizer import TokenizerEncodeRequest, TokenizerEncodeTask
+        task = TokenizerEncodeTask()
+        req = TokenizerEncodeRequest(audio=audio, model=model)
+        return await task.run(self, req)
 
     async def tokenizer_decode(
-        self, codes_json_path: str, model: Optional[str] = None
+        self, codes_json_path: str, model: str | None = None
     ) -> RunResult:
-        model_id_or_path = self._resolve_model(model, expected_kind="tokenizer")
-        run_id, run_dir = self.outputs.new_run_dir("tokenizer_decode")
-        params = {
-            "task": "tokenizer_decode",
-            "model": model_id_or_path,
-            "codes_json_path": codes_json_path,
-        }
-        self.outputs.write_params(run_dir, params)
+        from ..tasks.tokenizer import TokenizerDecodeRequest, TokenizerDecodeTask
+        task = TokenizerDecodeTask()
+        req = TokenizerDecodeRequest(codes_json_path=codes_json_path, model=model)
+        return await task.run(self, req)
 
-        codes_path = Path(codes_json_path).resolve()
-        import json
+    # --- Pipeline Runners ---
 
-        enc = json.loads(codes_path.read_text(encoding="utf-8"))
-
-        async with self._sem:
-            tok = await asyncio.to_thread(
-                self._get_or_load, model_id_or_path, "tokenizer"
-            )
-            wavs, sr = await asyncio.to_thread(tok.decode, enc)
-
-        audio_path = self.outputs.save_wav(
-            run_dir, np.asarray(wavs[0]), int(sr), filename="audio.wav"
+    async def run_long_form(
+        self,
+        text: str,
+        task_type: str = "custom_voice",
+        speaker: str = "Ryan",
+        language: str = "Auto",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+    ) -> RunResult:
+        from ..pipelines.long_form import LongFormPipeline, LongFormRequest
+        pipe = LongFormPipeline()
+        req = LongFormRequest(
+            text=text,
+            task_type=task_type,
+            speaker=speaker,
+            language=language,
+            model=model,
+            gen=gen or {},
         )
-        meta = {"sample_rate": int(sr), "files": [audio_path.name]}
-        self.outputs.write_meta(run_dir, meta)
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
+        return await pipe.run(self, req)
+
+    async def run_npc_pack(
+        self,
+        csv_path: str,
+        speaker_map: dict[str, dict[str, Any]],
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+    ) -> RunResult:
+        from ..pipelines.npc_pack import NPCPackPipeline, NPCPackRequest
+        pipe = NPCPackPipeline()
+        req = NPCPackRequest(
+            csv_path=csv_path, speaker_map=speaker_map, model=model, gen=gen or {}
         )
+        return await pipe.run(self, req)
+
+    async def run_script_read(
+        self,
+        script_text: str,
+        speaker_map: dict[str, dict[str, Any]],
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+    ) -> RunResult:
+        from ..pipelines.script_read import ScriptReadPipeline, ScriptReadRequest
+        pipe = ScriptReadPipeline()
+        req = ScriptReadRequest(
+            script_text=script_text,
+            speaker_map=speaker_map,
+            model=model,
+            gen=gen or {},
+        )
+        return await pipe.run(self, req)
+
+    async def run_audiobook(
+        self,
+        chapter_paths: list[str],
+        task_type: str = "custom_voice",
+        speaker: str = "Ryan",
+        language: str = "Auto",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+        merge_all: bool = True,
+    ) -> RunResult:
+        from ..pipelines.audiobook import AudiobookPipeline, AudiobookRequest
+        pipe = AudiobookPipeline()
+        req = AudiobookRequest(
+            chapter_paths=chapter_paths,
+            task_type=task_type,
+            speaker=speaker,
+            language=language,
+            model=model,
+            gen=gen or {},
+            merge_all=merge_all,
+        )
+        return await pipe.run(self, req)
+
+    async def run_subtitles(
+        self,
+        srt_path: str,
+        speaker: str = "Ryan",
+        language: str = "Auto",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+        preserve_timing: bool = True,
+    ) -> RunResult:
+        from ..pipelines.subtitles import SubtitlesPipeline, SubtitlesRequest
+        pipe = SubtitlesPipeline()
+        req = SubtitlesRequest(
+            srt_path=srt_path,
+            speaker=speaker,
+            language=language,
+            model=model,
+            gen=gen or {},
+            preserve_timing=preserve_timing,
+        )
+        return await pipe.run(self, req)
+
+    async def stream_custom_voice(
+        self,
+        text: str,
+        language: str = "Auto",
+        speaker: str = "Ryan",
+        instruct: str = "",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[np.ndarray, int]]:
+        from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+        task = CustomVoiceTask()
+        req = CustomVoiceRequest(
+            text=text,
+            language=language,
+            speaker=speaker,
+            instruct=instruct,
+            model=model,
+            gen=gen or {},
+        )
+        async for chunk in task.stream(self, req):
+            yield chunk
+
+    async def stream_voice_design(
+        self,
+        text: str,
+        language: str = "Auto",
+        instruct: str = "",
+        model: str | None = None,
+        gen: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[np.ndarray, int]]:
+        from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
+        task = VoiceDesignTask()
+        req = VoiceDesignRequest(
+            text=text,
+            language=language,
+            instruct=instruct,
+            model=model,
+            gen=gen or {},
+        )
+        async for chunk in task.stream(self, req):
+            yield chunk
+
+    async def stream_voice_clone(
+        self,
+        text: str,
+        language: str = "Auto",
+        ref_audio: str | None = None,
+        ref_text: str | None = None,
+        voice_profile: str | None = None,
+        model: str | None = None,
+        x_vector_only_mode: bool = False,
+        use_cached_prompt: bool = True,
+        gen: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[np.ndarray, int]]:
+        from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+        task = VoiceCloneTask()
+        req = VoiceCloneRequest(
+            text=text,
+            language=language,
+            ref_audio=ref_audio,
+            ref_text=ref_text,
+            voice_profile=voice_profile,
+            model=model,
+            x_vector_only_mode=x_vector_only_mode,
+            use_cached_prompt=use_cached_prompt,
+            gen=gen or {},
+        )
+        async for chunk in task.stream(self, req):
+            yield chunk
+
+    def export_run(self, run_id: str) -> Path:
+        _, run_dir = self.outputs.new_run_dir("export_run")
+        zip_path = run_dir / f"{run_id}.zip"
+        return self.outputs.export_run(run_id, zip_path)
 
     @staticmethod
     def wav_to_pcm16_bytes(wav: np.ndarray) -> bytes:
