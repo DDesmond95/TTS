@@ -1,6 +1,6 @@
 # Architecture
 
-This project is a local inference platform for Qwen3-TTS that exposes a single, consistent capability surface through:
+This project is a local inference platform for multiple voice AI models (TTS, voice conversion, singing synthesis, and voice editing).
 
 - Python service layer (engine + task modules)
 - HTTP API (REST for non-stream)
@@ -10,7 +10,7 @@ This project is a local inference platform for Qwen3-TTS that exposes a single, 
 Design goals:
 
 - One codepath for inference (API and UI must call the same core task implementations).
-- Conservative runtime defaults for a single 6GB GPU (GTX 1660 Ti):
+- Conservative runtime defaults for a single 6GB GPU (GTX 1660 Ti), suitable for lightweight speech models such as Qwen3-TTS and MeanVC:
   - fp16 by default
   - no FlashAttention
   - batch size 1 by default
@@ -69,7 +69,12 @@ Recommended module groups inside src/<package>/:
 
 - model_registry.py
   - maps “model names” to local paths
-  - declares model capabilities per checkpoint (custom, clone, design, tokenizer)
+  - declares model capabilities per checkpoint or model family
+  - examples:
+    - Qwen3-TTS: custom voice, clone, design, tokenizer
+    - MeanVC: voice conversion
+    - TCSinger2: singing synthesis
+    - VoiceSculptor: voice editing
 - loader.py
   - lazy load models with dtype/device options
   - caching policy (default one loaded model)
@@ -92,6 +97,12 @@ Recommended module groups inside src/<package>/:
 - voice_clone.py
 - design_then_clone.py
 - tokenizer_codec.py
+
+Additional model-family tasks:
+
+- voice_conversion.py (MeanVC)
+- singing_synthesis.py (TCSinger2)
+- voice_edit.py (VoiceSculptor)
 
 4. pipelines/
 
@@ -177,8 +188,8 @@ Typical non-stream request flow:
 1. API/UI receives request
 2. Validate request schema
 3. Resolve model and voice
-   - model_registry chooses the checkpoint
-   - voice store returns voice profile defaults, if used
+   - model_registry chooses the checkpoint or model family
+   - voice store returns voice profile defaults if used
 4. Engine loads model if needed (lazy load)
 5. Task.run() executes inference
 6. Storage writes outputs run folder
@@ -200,6 +211,11 @@ Client
 Streaming is implemented as:
 
 - JSON control messages + binary audio chunk frames.
+
+Two streaming patterns exist:
+
+1. Text → audio streaming (Qwen3-TTS)
+2. Audio → audio streaming (MeanVC voice conversion)
 
 Flow:
 
@@ -246,7 +262,11 @@ Rationale:
 The registry should expose:
 
 - “available models” (what exists in models/)
-- “capabilities” per model (custom/design/clone/tokenizer)
+- “capabilities” per model (examples):
+  - Qwen3-TTS: custom voice, design, clone, tokenizer
+  - MeanVC: voice conversion
+  - TCSinger2: singing synthesis
+  - VoiceSculptor: voice editing
 - “defaults” (recommended model per task)
 
 UI and API accept:
@@ -258,8 +278,8 @@ UI and API accept:
 
 Add a new feature by adding it as:
 
-- a new task (if it is a single inference capability), or
-- a new pipeline (if it composes multiple tasks)
+- a new task (single model capability, e.g., voice conversion),
+- or a new pipeline (composition of tasks, e.g., long-form narration).
 
 Steps:
 

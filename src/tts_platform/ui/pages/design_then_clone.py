@@ -41,7 +41,11 @@ def create_design_then_clone_page(state: UIState):
         try:
             if state.mode == "local_engine":
                 assert state.engine is not None
-                from ...tasks.design_then_clone import DesignThenCloneRequest, DesignThenCloneTask
+                from ...tasks.design_then_clone import (
+                    DesignThenCloneRequest,
+                    DesignThenCloneTask,
+                )
+
                 task = DesignThenCloneTask()
                 req = DesignThenCloneRequest(**payload)
                 res = await task.run(state.engine, req)
@@ -56,24 +60,39 @@ def create_design_then_clone_page(state: UIState):
             return "", None, f"ERROR: {e}"
 
     with gr.Column():
-        gr.Markdown("### Design → Clone Workflow\nDesign a unique voice first, then use it as a reference to generate multiple lines.")
+        gr.Markdown(
+            "### Design → Clone Workflow\nDesign a unique voice first, then use it as a reference to generate multiple lines."
+        )
 
         with gr.Row():
             with gr.Column():
                 gr.Markdown("#### Step 1: Design Reference")
-                d_text = gr.Textbox(label="Design Text (e.g., 'Hello, this is my new voice.')", lines=3)
-                d_lang = gr.Dropdown(choices=LANG_CHOICES, value="English", label="Language")
-                d_inst = gr.Textbox(label="Voice Description", placeholder="e.g., 'A confident female voice with a British accent.'")
+                d_text = gr.Textbox(
+                    label="Design Text (e.g., 'Hello, this is my new voice.')", lines=3
+                )
+                d_lang = gr.Dropdown(
+                    choices=LANG_CHOICES, value="English", label="Language"
+                )
+                d_inst = gr.Textbox(
+                    label="Voice Description",
+                    placeholder="e.g., 'A confident female voice with a British accent.'",
+                )
                 vd_model = gr.Dropdown(label="VoiceDesign Model")
 
             with gr.Column():
                 gr.Markdown("#### Step 2: Clone Target")
-                c_text = gr.Textbox(label="Target Text (the content you actually want)", lines=5)
-                c_lang = gr.Dropdown(choices=LANG_CHOICES, value="English", label="Language")
+                c_text = gr.Textbox(
+                    label="Target Text (the content you actually want)", lines=5
+                )
+                c_lang = gr.Dropdown(
+                    choices=LANG_CHOICES, value="English", label="Language"
+                )
                 base_model = gr.Dropdown(label="Base Model")
 
         with gr.Accordion("Settings", open=False):
-            max_tokens = gr.Slider(64, 2048, value=1024, step=64, label="Max New Tokens")
+            max_tokens = gr.Slider(
+                64, 2048, value=1024, step=64, label="Max New Tokens"
+            )
 
         btn = gr.Button("Execute Workflow", variant="primary")
 
@@ -82,20 +101,30 @@ def create_design_then_clone_page(state: UIState):
             audio = gr.Audio(label="Final Audio", type="filepath")
         meta = gr.Textbox(label="Metadata", lines=5)
 
-        # Initialization helpers
-        def refresh():
+        async def refresh():
             labels, _ = state.model_choices()
             vd_labels = [label for label in labels if "voicedesign" in label.lower()]
             base_labels = [label for label in labels if "base" in label.lower()]
             return (
-                gr.Dropdown(choices=vd_labels, value=vd_labels[0] if vd_labels else None),
-                gr.Dropdown(choices=base_labels, value=base_labels[0] if base_labels else None),
+                gr.update(choices=vd_labels, value=vd_labels[0] if vd_labels else None),
+                gr.update(
+                    choices=base_labels, value=base_labels[0] if base_labels else None
+                ),
             )
 
         btn.click(
             fn=do_run,
-            inputs=[d_text, d_lang, d_inst, c_text, c_lang, vd_model, base_model, max_tokens],
-            outputs=[run_id, audio, meta]
+            inputs=[
+                d_text,
+                d_lang,
+                d_inst,
+                c_text,
+                c_lang,
+                vd_model,
+                base_model,
+                max_tokens,
+            ],
+            outputs=[run_id, audio, meta],
         )
 
-        return refresh
+    return refresh, [vd_model, base_model]

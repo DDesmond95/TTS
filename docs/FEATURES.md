@@ -19,7 +19,7 @@ All the feature ideas for this project.
   - explicit VRAM/concurrency safety checks
 - Supports both local model paths (your `models/` folder) and remote model IDs (optional), but encourages local for repeatable runs.
 
-## 2. Supported inference tasks (Qwen3-TTS feature surface)
+## 2. Supported inference tasks (model capability surface)
 
 ### 2.A. Custom Voice TTS (0.6B and 1.7B)
 
@@ -64,6 +64,62 @@ All the feature ideas for this project.
 - Decode:
   - codes → audio
 - Batch encode/decode for folders (as a utility).
+
+### 2.F. Real-time Voice Conversion (MeanVC)
+
+- Speech → speech conversion.
+- Convert input speaker into a target voice.
+- Supports microphone streaming.
+- Works in both:
+  - batch mode (file input)
+  - real-time streaming mode.
+
+Inputs:
+
+- source_audio
+- target_voice profile or reference audio
+
+Outputs:
+
+- converted speech audio
+
+Typical uses:
+
+- voice changer
+- VTuber voice transformation
+- anonymization
+
+### 2.G. Singing Voice Synthesis (TCSinger2)
+
+- Generate expressive singing voice.
+- Inputs:
+  - lyrics
+  - melody or score (optional depending on mode)
+- Outputs:
+  - singing audio waveform.
+
+Use cases:
+
+- AI music generation
+- virtual singers
+- singing synthesis research.
+
+### 2.H. Voice Editing / Design (VoiceSculptor)
+
+- Modify voice attributes of existing audio.
+- Allows:
+  - style modification
+  - timbre editing
+  - emotional adjustments.
+
+Inputs:
+
+- reference audio
+- target voice description
+
+Outputs:
+
+- modified speech audio.
 
 ## 3. API features (non-stream and streaming)
 
@@ -359,3 +415,23 @@ These are compositions of tasks + text chunking + audio stitching.
   - quick voice preset switching
   - one-click style presets (whisper/excited/etc.)
   - stop/cancel streaming button
+
+## 16. Model families supported
+
+The platform supports multiple voice AI model categories.
+
+Text-to-Speech
+
+- Qwen3-TTS
+
+Speech-to-Speech Voice Conversion
+
+- MeanVC
+
+Singing Voice Synthesis
+
+- TCSinger2
+
+Voice Editing / Manipulation
+
+- VoiceSculptor

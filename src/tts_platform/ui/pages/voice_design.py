@@ -40,6 +40,7 @@ def create_voice_design_page(state: UIState):
             if state.mode == "local_engine":
                 assert state.engine is not None
                 from ...tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
+
                 task = VoiceDesignTask()
                 req = VoiceDesignRequest(**payload)
                 res = await task.run(state.engine, req)
@@ -61,7 +62,9 @@ def create_voice_design_page(state: UIState):
             model = gr.Dropdown(label="Model")
 
     with gr.Row():
-        preset = gr.Dropdown(choices=list(STYLE_PRESETS.keys()), value="(none)", label="Style preset")
+        preset = gr.Dropdown(
+            choices=list(STYLE_PRESETS.keys()), value="(none)", label="Style preset"
+        )
         inst = gr.Textbox(label="Voice description / Instruct", lines=3, value="")
 
     with gr.Accordion("Advanced", open=False):
@@ -76,15 +79,15 @@ def create_voice_design_page(state: UIState):
         audio = gr.Audio(label="Audio", type="filepath")
     meta = gr.Textbox(lines=8, label="Response / Metadata")
 
-    def refresh():
+    async def refresh():
         labels, _ = state.model_choices()
         vd_labels = [label for label in labels if "voicedesign" in label.lower()]
-        return gr.Dropdown(choices=vd_labels, value=vd_labels[0] if vd_labels else None)
+        return gr.update(choices=vd_labels, value=vd_labels[0] if vd_labels else None)
 
     btn.click(
         fn=do_run,
         inputs=[t, lang, preset, inst, model, tokens, tp, tmp],
-        outputs=[run_id, audio, meta]
+        outputs=[run_id, audio, meta],
     )
 
-    return refresh
+    return refresh, [model]

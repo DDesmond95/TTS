@@ -14,6 +14,8 @@ runtime:
   text_max_chars: 20000
   upload_max_mb: 50
   seed: null
+  # attn_implementation: eager # eager | sdpa | flash_attention_2
+  disable_sliding_window: true # Workaround for Qwen3 attention bugs
 
 api:
   host: 0.0.0.0

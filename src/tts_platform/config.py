@@ -20,6 +20,8 @@ class RuntimeConfig:
     text_max_chars: int = 20000
     upload_max_mb: int = 50
     seed: int | None = None
+    attn_implementation: str | None = None
+    disable_sliding_window: bool = False
 
 
 @dataclass
@@ -94,6 +96,13 @@ def _apply_env_overrides(cfg: dict[str, Any]) -> dict[str, Any]:
             "DEFAULT_MAX_NEW_TOKENS", cfg["runtime"].get("default_max_new_tokens", 1024)
         )
     )
+    cfg["runtime"]["attn_implementation"] = os.getenv(
+        "ATTN_IMPLEMENTATION", cfg["runtime"].get("attn_implementation")
+    )
+    cfg["runtime"]["disable_sliding_window"] = os.getenv(
+        "DISABLE_SLIDING_WINDOW",
+        str(cfg["runtime"].get("disable_sliding_window", "False")),
+    ).lower() in ("true", "1", "yes")
 
     # API
     cfg.setdefault("api", {})

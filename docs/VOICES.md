@@ -27,7 +27,12 @@ profiles/<voice_id>.json
 Fields:
 
 - id: string (voice_id)
-- type: "customvoice" | "clone" | "design_template"
+- type:
+  - customvoice
+  - clone
+  - design_template
+  - conversion_target
+  - singer
 - display_name: string
 - defaults:
   language: "Auto" | "English" | ...

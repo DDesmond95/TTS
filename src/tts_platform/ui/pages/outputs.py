@@ -53,10 +53,18 @@ def create_outputs_page(state: UIState):
         audio = str(audio_path) if audio_path.exists() else None
 
         params_path = run_dir / "params.json"
-        params = params_path.read_text(encoding="utf-8") if params_path.exists() else "No params found"
+        params = (
+            params_path.read_text(encoding="utf-8")
+            if params_path.exists()
+            else "No params found"
+        )
 
         meta_path = run_dir / "meta.json"
-        meta = meta_path.read_text(encoding="utf-8") if meta_path.exists() else "No meta found"
+        meta = (
+            meta_path.read_text(encoding="utf-8")
+            if meta_path.exists()
+            else "No meta found"
+        )
 
         return audio, params, meta
 
@@ -74,12 +82,14 @@ def create_outputs_page(state: UIState):
                     params_out = gr.Textbox(label="Parameters", lines=10)
                     meta_out = gr.Textbox(label="Metadata", lines=10)
 
-        def refresh_dropdown():
+        async def refresh_dropdown():
             runs = list_runs()
             choices = [r[0] for r in runs]
-            return gr.Dropdown(choices=choices, value=choices[0] if choices else None)
+            return gr.update(choices=choices, value=choices[0] if choices else None)
 
         refresh_btn.click(fn=refresh_dropdown, outputs=run_list)
-        run_list.change(fn=load_run, inputs=run_list, outputs=[audio_out, params_out, meta_out])
+        run_list.change(
+            fn=load_run, inputs=run_list, outputs=[audio_out, params_out, meta_out]
+        )
 
-        return refresh_dropdown
+    return refresh_dropdown, [run_list]

@@ -62,6 +62,7 @@ class TTSEngine:
 
     def save_voice(self, voice_id: str, profile_data: dict) -> None:
         from ..voices.schema import VoiceProfile
+
         profile = VoiceProfile.model_validate(profile_data)
         self.voices.save(voice_id, profile)
 
@@ -149,12 +150,36 @@ class TTSEngine:
             )
         else:
             from qwen_tts import Qwen3TTSModel
+            from qwen_tts.core.models.configuration_qwen3_tts import Qwen3TTSConfig
+            from qwen_tts.core.models.modeling_qwen3_tts import (
+                Qwen3TTSForConditionalGeneration,
+            )
+            from qwen_tts.core.models.processing_qwen3_tts import Qwen3TTSProcessor
+            from transformers import AutoConfig, AutoModel, AutoProcessor
+
+            # Ensure architectures are registered before AutoConfig.from_pretrained
+            try:
+                AutoConfig.register("qwen3_tts", Qwen3TTSConfig)
+                AutoModel.register(Qwen3TTSConfig, Qwen3TTSForConditionalGeneration)
+                AutoProcessor.register(Qwen3TTSConfig, Qwen3TTSProcessor)
+            except Exception:
+                pass
+
+            cfg_obj = AutoConfig.from_pretrained(
+                model_id_or_path, trust_remote_code=True
+            )
+            if self.runtime.disable_sliding_window:
+                log.info(
+                    "Disabling sliding window attention for model: %s", model_id_or_path
+                )
+                cfg_obj.sliding_window = None
 
             obj = Qwen3TTSModel.from_pretrained(
                 model_id_or_path,
+                config=cfg_obj,
                 device_map=device,
                 dtype=torch_dtype,
-                attn_implementation=None,  # explicitly no FlashAttention
+                attn_implementation=self.runtime.attn_implementation,
             )
 
         self._cache[model_id_or_path] = Loaded(
@@ -186,6 +211,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+
         task = CustomVoiceTask()
         req = CustomVoiceRequest(
             text=text,
@@ -206,6 +232,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
+
         task = VoiceDesignTask()
         req = VoiceDesignRequest(
             text=text,
@@ -229,6 +256,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+
         task = VoiceCloneTask()
         req = VoiceCloneRequest(
             text=text,
@@ -255,7 +283,11 @@ class TTSEngine:
         gen_design: dict[str, Any] | None = None,
         gen_clone: dict[str, Any] | None = None,
     ) -> RunResult:
-        from ..tasks.design_then_clone import DesignThenCloneRequest, DesignThenCloneTask
+        from ..tasks.design_then_clone import (
+            DesignThenCloneRequest,
+            DesignThenCloneTask,
+        )
+
         task = DesignThenCloneTask()
         req = DesignThenCloneRequest(
             design_text=design_text,
@@ -270,10 +302,9 @@ class TTSEngine:
         )
         return await task.run(self, req)
 
-    async def tokenizer_encode(
-        self, audio: str, model: str | None = None
-    ) -> RunResult:
+    async def tokenizer_encode(self, audio: str, model: str | None = None) -> RunResult:
         from ..tasks.tokenizer import TokenizerEncodeRequest, TokenizerEncodeTask
+
         task = TokenizerEncodeTask()
         req = TokenizerEncodeRequest(audio=audio, model=model)
         return await task.run(self, req)
@@ -282,6 +313,7 @@ class TTSEngine:
         self, codes_json_path: str, model: str | None = None
     ) -> RunResult:
         from ..tasks.tokenizer import TokenizerDecodeRequest, TokenizerDecodeTask
+
         task = TokenizerDecodeTask()
         req = TokenizerDecodeRequest(codes_json_path=codes_json_path, model=model)
         return await task.run(self, req)
@@ -298,6 +330,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..pipelines.long_form import LongFormPipeline, LongFormRequest
+
         pipe = LongFormPipeline()
         req = LongFormRequest(
             text=text,
@@ -317,6 +350,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..pipelines.npc_pack import NPCPackPipeline, NPCPackRequest
+
         pipe = NPCPackPipeline()
         req = NPCPackRequest(
             csv_path=csv_path, speaker_map=speaker_map, model=model, gen=gen or {}
@@ -331,6 +365,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> RunResult:
         from ..pipelines.script_read import ScriptReadPipeline, ScriptReadRequest
+
         pipe = ScriptReadPipeline()
         req = ScriptReadRequest(
             script_text=script_text,
@@ -351,6 +386,7 @@ class TTSEngine:
         merge_all: bool = True,
     ) -> RunResult:
         from ..pipelines.audiobook import AudiobookPipeline, AudiobookRequest
+
         pipe = AudiobookPipeline()
         req = AudiobookRequest(
             chapter_paths=chapter_paths,
@@ -373,6 +409,7 @@ class TTSEngine:
         preserve_timing: bool = True,
     ) -> RunResult:
         from ..pipelines.subtitles import SubtitlesPipeline, SubtitlesRequest
+
         pipe = SubtitlesPipeline()
         req = SubtitlesRequest(
             srt_path=srt_path,
@@ -394,6 +431,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> AsyncIterator[tuple[np.ndarray, int]]:
         from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+
         task = CustomVoiceTask()
         req = CustomVoiceRequest(
             text=text,
@@ -415,6 +453,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> AsyncIterator[tuple[np.ndarray, int]]:
         from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
+
         task = VoiceDesignTask()
         req = VoiceDesignRequest(
             text=text,
@@ -439,6 +478,7 @@ class TTSEngine:
         gen: dict[str, Any] | None = None,
     ) -> AsyncIterator[tuple[np.ndarray, int]]:
         from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+
         task = VoiceCloneTask()
         req = VoiceCloneRequest(
             text=text,

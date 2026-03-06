@@ -42,6 +42,7 @@ def create_custom_voice_page(state: UIState):
             if state.mode == "local_engine":
                 assert state.engine is not None
                 from ...tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+
                 task = CustomVoiceTask()
                 req = CustomVoiceRequest(**payload)
                 res = await task.run(state.engine, req)
@@ -60,11 +61,15 @@ def create_custom_voice_page(state: UIState):
             t = gr.Textbox(label="Text", lines=7, placeholder="Enter text...")
         with gr.Column(scale=1):
             lang = gr.Dropdown(choices=LANG_CHOICES, value="English", label="Language")
-            spk = gr.Dropdown(choices=CUSTOMVOICE_SPEAKERS, value="Ryan", label="Speaker")
+            spk = gr.Dropdown(
+                choices=CUSTOMVOICE_SPEAKERS, value="Ryan", label="Speaker"
+            )
             model = gr.Dropdown(label="Model")
 
     with gr.Row():
-        preset = gr.Dropdown(choices=list(STYLE_PRESETS.keys()), value="(none)", label="Style preset")
+        preset = gr.Dropdown(
+            choices=list(STYLE_PRESETS.keys()), value="(none)", label="Style preset"
+        )
         inst = gr.Textbox(label="Instruct (overrides preset if set)", lines=2, value="")
 
     with gr.Accordion("Advanced", open=False):
@@ -79,15 +84,15 @@ def create_custom_voice_page(state: UIState):
         audio = gr.Audio(label="Audio", type="filepath")
     meta = gr.Textbox(lines=8, label="Response / Metadata")
 
-    def refresh():
+    async def refresh():
         labels, _ = state.model_choices()
         cv_labels = [label for label in labels if "customvoice" in label.lower()]
-        return gr.Dropdown(choices=cv_labels, value=cv_labels[0] if cv_labels else None)
+        return gr.update(choices=cv_labels, value=cv_labels[0] if cv_labels else None)
 
     btn.click(
         fn=do_run,
         inputs=[t, lang, spk, preset, inst, model, tokens, tp, tmp],
-        outputs=[run_id, audio, meta]
+        outputs=[run_id, audio, meta],
     )
 
-    return refresh
+    return refresh, [model]

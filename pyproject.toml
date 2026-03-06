@@ -1,7 +1,7 @@
 [project]
 name = "qwen3-tts-platform"
 version = "0.1.0"
-description = "Local Qwen3-TTS platform: Python API + HTTP API + streaming transport + Web UI"
+description = "Local voice AI platform supporting Qwen3-TTS, MeanVC, TCSinger2, and VoiceSculptor with Python API, HTTP API, streaming transport, and Web UI"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -19,6 +19,10 @@ dependencies = [
   "uvicorn[standard]",
   "pydantic",
   "gradio",
+
+  # audio / ML runtime
+  "torch",
+  "torchaudio",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +33,15 @@ api = [
 ui = [
   "gradio",
   "requests",
+]
+voice_conversion = [
+  "torch",
+  "torchaudio",
+]
+
+singing = [
+  "torch",
+  "torchaudio",
 ]
 dev = [
   "pytest",

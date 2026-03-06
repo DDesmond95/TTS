@@ -16,18 +16,23 @@ def create_live_page(state: UIState):
             voice_list = gr.Dropdown(
                 label="Quick Voice Selection",
                 choices=[v["id"] for v in state.get_voices()],
-                value=next((v["id"] for v in state.get_voices()), None)
+                value=next((v["id"] for v in state.get_voices()), None),
             )
             refresh_btn = gr.Button("Refresh Voices")
 
             style_list = gr.Radio(
                 label="Style Overrides",
                 choices=list(STYLE_PRESETS.keys()),
-                value="(none)"
+                value="(none)",
             )
 
             with gr.Accordion("Advanced Live Settings", open=False):
-                model_list = gr.Dropdown(label="Model Override", choices=["0.6b-customvoice", "1.7b-customvoice", "1.7b-voicedesign"])
+                m_labels, _ = state.model_choices()
+                model_list = gr.Dropdown(
+                    label="Model Override",
+                    choices=m_labels,
+                    value=m_labels[0] if m_labels else None,
+                )
                 top_p = gr.Slider(0.0, 1.0, 0.8, step=0.05, label="Top P")
                 temp = gr.Slider(0.0, 1.5, 1.0, step=0.05, label="Temperature")
 
@@ -37,7 +42,7 @@ def create_live_page(state: UIState):
                 label="Text to Speak",
                 placeholder="Type here and press Speak...",
                 lines=5,
-                autofocus=True
+                autofocus=True,
             )
 
             with gr.Row():
@@ -47,7 +52,9 @@ def create_live_page(state: UIState):
             # For Gradio output streaming:
             # Note: in many hosted Gradio environments, streaming output is tricky.
             # We will use the chunk iterator from the engine.
-            audio_stream = gr.Audio(label="Generated Audio", streaming=True, autoplay=True)
+            audio_stream = gr.Audio(
+                label="Generated Audio", streaming=True, autoplay=True
+            )
 
             status = gr.Markdown("Ready")
 
@@ -71,7 +78,11 @@ def create_live_page(state: UIState):
                 if vtype == "customvoice":
                     spk = p_obj.defaults.speaker if p_obj else "Ryan"
                     async for chunk_wav, sr in state.engine.stream_custom_voice(
-                        text=text, speaker=spk, instruct=instruct, model=model, gen=gen_params
+                        text=text,
+                        speaker=spk,
+                        instruct=instruct,
+                        model=model,
+                        gen=gen_params,
                     ):
                         # Convert float32 [-1, 1] to int16
                         i16 = (np.clip(chunk_wav, -1.0, 1.0) * 32767.0).astype(np.int16)
@@ -86,17 +97,18 @@ def create_live_page(state: UIState):
                 # API streaming requires a WebSocket client which we haven't implemented here yet.
                 # For now, yield some silence.
                 import asyncio
+
                 for _ in range(5):
                     await asyncio.sleep(0.1)
                     yield (24000, np.zeros(12000, dtype=np.int16))
         except Exception as e:
-             # Yield a small burst of noise or just stop
-             print(f"Live Error: {e}")
+            # Yield a small burst of noise or just stop
+            print(f"Live Error: {e}")
 
     speak_btn.click(
         fn=get_live_stream,
         inputs=[text_input, voice_list, style_list, model_list, top_p, temp],
-        outputs=audio_stream
+        outputs=audio_stream,
     )
 
     def on_stop():
@@ -104,9 +116,14 @@ def create_live_page(state: UIState):
 
     stop_btn.click(fn=on_stop, outputs=status)
 
-    def refresh():
-        return gr.update(choices=[v["id"] for v in state.get_voices()])
+    async def refresh():
+        m_labels, _ = state.model_choices()
+        v_ids = [v["id"] for v in state.get_voices()]
+        return (
+            gr.update(choices=v_ids),
+            gr.update(choices=m_labels, value=m_labels[0] if m_labels else None),
+        )
 
-    refresh_btn.click(fn=refresh, outputs=voice_list)
+    refresh_btn.click(fn=refresh, outputs=[voice_list, model_list])
 
-    return refresh
+    return refresh, [voice_list, model_list]

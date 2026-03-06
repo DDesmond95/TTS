@@ -60,7 +60,7 @@ Response pattern (recommended):
 
 ## Errors (recommended)
 
-- 400 for validation errors
+- 400 for validation errors (including invalid audio format, duration limits, unsupported sample rate/channels)
 - 404 for missing model/voice
 - 409 for concurrency limit reached
 - 500 for runtime errors
@@ -68,3 +68,81 @@ Response pattern (recommended):
 Error body:
 
 - { "error": { "code": "...", "message": "...", "details": {...} } }
+
+## Voice conversion
+
+POST /voice/convert
+
+Inputs (recommended: multipart/form-data):
+
+- source_audio: WAV/FLAC/MP3 upload (server will resample as needed)
+- target_voice: voice profile id (type=conversion_target) or reference audio
+
+Optional:
+
+- output_format: "wav" | "pcm16"
+- sample_rate: integer
+- normalize_loudness: bool
+
+Returns:
+
+- JSON with run_id + artifact references + metadata
+  Optionally:
+- direct audio bytes if requested (small outputs)
+
+## Singing synthesis
+
+POST /sing/generate
+
+Inputs:
+
+- lyrics: string
+- melody (optional, depending on supported mode):
+  - midi_file upload OR
+  - note list JSON OR
+  - score file upload (if supported)
+    Optional:
+- singer_voice: voice profile id (type=singer)
+- output_format, sample_rate
+
+Returns:
+
+- JSON with run_id + artifact references + metadata
+
+Optionally:
+
+- direct audio bytes if requested
+
+## Voice editing
+
+POST /voice/edit
+
+Inputs (recommended: multipart/form-data):
+
+- input_audio: WAV/FLAC/MP3 upload
+- style: instruction string and/or reference audio
+
+Optional:
+
+- strength: float (0–1)
+- output_format, sample_rate, normalize_loudness
+
+Returns:
+
+- JSON with run_id + artifact references + metadata
+  Optionally:
+- direct audio bytes if requested
+
+## Streaming (WebSocket)
+
+See STREAMING.md for protocol details.
+
+TTS streaming:
+
+- WS /ws/tts/custom_voice
+- WS /ws/tts/voice_design
+- WS /ws/tts/voice_clone
+
+Voice conversion streaming:
+
+- WS /ws/voice/live

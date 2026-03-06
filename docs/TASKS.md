@@ -4,54 +4,82 @@ A “task” is an inference capability with a stable interface.
 
 Common interface:
 
-- validate(request) -> request
-- run(request) -> result (non-stream)
-- stream(request) -> async iterator of audio chunks (if supported)
+- `validate(request) -> request`
+- `run(request) -> result (non-stream)`
+- `stream(request) -> async iterator of audio chunks (if supported)`
 
-## Task: CustomVoice
+Tasks may support **batch inference**, **streaming inference**, or both depending on the underlying model.
 
-Inputs:
-
-- text: string | list[string]
-- language: string | list[string] (or "Auto")
-- speaker: string | list[string]
-- instruct: optional string | list[string]
-- generation kwargs: max_new_tokens, top_p, temperature, etc.
-
-Outputs:
-
-- wav(s), sample_rate
-
-## Task: VoiceDesign (1.7B)
+# Task: CustomVoice
 
 Inputs:
 
-- text
-- language
-- instruct (voice description)
+- `text`: string | list[string]
+- `language`: string | list[string] (or `"Auto"`)
+- `speaker`: string | list[string]
+- `instruct`: optional string | list[string]
+- generation kwargs:
+  - `max_new_tokens`
+  - `top_p`
+  - `temperature`
+  - etc.
 
 Outputs:
 
-- wav, sample_rate
+- `wav(s)`
+- `sample_rate`
 
-## Task: VoiceClone (Base)
+Streaming support:
+
+- yes
+
+# Task: VoiceDesign (1.7B)
 
 Inputs:
 
-- text
-- language
-- ref_audio (path/url/array)
-- ref_text (string)
-  or:
-- voice_clone_prompt (cached prompt object)
-  Options:
-- x_vector_only_mode
+- `text`
+- `language`
+- `instruct` (voice description)
 
 Outputs:
 
-- wav(s), sample_rate
+- `wav`
+- `sample_rate`
 
-## Task: DesignThenClone
+Streaming support:
+
+- yes
+
+# Task: VoiceClone (Base)
+
+Inputs:
+
+- `text`
+- `language`
+
+Reference voice options:
+
+- `ref_audio` (path / URL / array)
+- `ref_text` (string)
+
+or
+
+- `voice_clone_prompt` (cached prompt object)
+
+Options:
+
+- `x_vector_only_mode`
+
+Outputs:
+
+- `wav(s)`
+- `sample_rate`
+
+Streaming support:
+
+- yes
+
+# Task: DesignThenClone
 
 Pipeline:
 
@@ -64,11 +92,15 @@ Outputs:
 - reference clip artifact
 - clone outputs
 
-## Task: Tokenizer Encode/Decode
+Streaming support:
+
+- optional (depends on underlying clone task)
+
+# Task: Tokenizer Encode/Decode
 
 Encode inputs:
 
-- audio path/url/array
+- audio path / URL / array
 
 Decode inputs:
 
@@ -78,3 +110,96 @@ Outputs:
 
 - codes (encode)
 - wav (decode)
+
+Streaming support:
+
+- no
+
+# Task: VoiceConversion (MeanVC)
+
+Voice conversion transforms **input speech into a target voice** while preserving the linguistic content.
+
+Inputs:
+
+- `source_audio`
+  - path / upload / array
+
+- `target_voice`
+  - voice profile id (`type=conversion_target`)
+  - or reference audio
+
+Optional:
+
+- `sample_rate`
+- `normalize_loudness`
+- `output_format`
+
+Outputs:
+
+- converted audio waveform
+- `sample_rate`
+
+Streaming support:
+
+- yes (real-time)
+
+Streaming mode:
+
+- audio input frames are received continuously
+- converted audio frames are returned continuously
+
+# Task: SingingSynthesis (TCSinger2)
+
+Singing synthesis generates expressive singing audio from lyrics and musical information.
+
+Inputs:
+
+- `lyrics`
+- `melody` or `score` (optional depending on supported mode)
+
+Examples of melody formats:
+
+- MIDI file
+- note sequence JSON
+- MusicXML / score file
+
+Optional:
+
+- `singer_voice` (voice profile id, `type=singer`)
+
+Outputs:
+
+- singing audio waveform
+- `sample_rate`
+
+Streaming support:
+
+- no (batch inference)
+
+# Task: VoiceEdit (VoiceSculptor)
+
+Voice editing modifies the timbre or style of an existing speech recording.
+
+Inputs:
+
+- `input_audio`
+  - path / upload / array
+
+- `style_instruction`
+  - natural language description
+  - or reference audio
+
+Optional:
+
+- `strength` (0–1)
+- `sample_rate`
+- `output_format`
+
+Outputs:
+
+- edited speech audio waveform
+- `sample_rate`
+
+Streaming support:
+
+- no
