@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from .long_form import LongFormPipeline, LongFormRequest
 
-log = logging.getLogger("tts_platform.pipelines.audiobook")
+log = logging.getLogger("omnivoice_studio.pipelines.audiobook")
 
 class AudiobookRequest(BaseModel):
     chapter_paths: list[str]

@@ -54,10 +54,10 @@ API:
   -v $(pwd)/models:/app/models \
   -v $(pwd)/voices:/app/voices \
   -v $(pwd)/outputs:/app/outputs \
-  yourname/yourimage:tag
+  omnivoice/omnivoice-studio:tag
 
 UI (calling API):
 
 - docker run -p 7860:7860 \
   -e API_URL=http://host.docker.internal:8001 \
-  yourname/youruiimage:tag
+  omnivoice/youruiimage:tag

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from .base import Task
 
-log = logging.getLogger("tts_platform.tasks.tokenizer")
+log = logging.getLogger("omnivoice_studio.tasks.tokenizer")
 
 
 class TokenizerEncodeRequest(BaseModel):

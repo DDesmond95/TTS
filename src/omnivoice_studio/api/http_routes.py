@@ -24,7 +24,7 @@ from .schemas import (
     WarmupRequest,
 )
 
-log = logging.getLogger("tts_platform.api.http")
+log = logging.getLogger("omnivoice_studio.api.http")
 
 
 def get_engine() -> TTSEngine:

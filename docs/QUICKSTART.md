@@ -41,7 +41,7 @@ At minimum (typical):
 
 ## 3) Run API
 
-- python -m your_project_name.cli run-api --host 0.0.0.0 --port 8001
+- omnivoice run-api --host 0.0.0.0 --port 8001
 
 Check:
 
@@ -52,11 +52,11 @@ Check:
 
 Local UI calling local engine:
 
-- python -m your_project_name.cli run-ui --host 0.0.0.0 --port 7860
+- omnivoice run-ui --host 0.0.0.0 --port 7860
 
 Or UI calling API:
 
-- python -m your_project_name.cli run-ui --api-url http://localhost:8001
+- omnivoice run-ui --api-url http://localhost:8001
 
 ## 5) Generate first audio
 

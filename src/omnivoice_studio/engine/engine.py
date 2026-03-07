@@ -15,7 +15,7 @@ from ..models.registry import ModelRegistry
 from ..storage.outputs import OutputManager, RunResult
 from ..voices.store import VoiceStore
 
-log = logging.getLogger("tts_platform.engine")
+log = logging.getLogger("omnivoice_studio.engine")
 
 
 @dataclass

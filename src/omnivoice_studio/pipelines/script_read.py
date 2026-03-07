@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
 from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
 
-log = logging.getLogger("tts_platform.pipelines.script_read")
+log = logging.getLogger("omnivoice_studio.pipelines.script_read")
 
 
 class ScriptRow(BaseModel):

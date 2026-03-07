@@ -12,11 +12,11 @@ from .engine.engine import TTSEngine
 from .logging_utils import setup_logging
 from .ui.app import create_ui
 
-log = logging.getLogger("tts_platform.cli")
+log = logging.getLogger("omnivoice_studio.cli")
 
 
 def _repo_root() -> Path:
-    # src/tts_platform/cli.py -> repo root is 3 levels up: src/tts_platform -> src -> repo
+    # src/omnivoice_studio/cli.py -> repo root is 3 levels up: src/omnivoice_studio -> src -> repo
     return Path(__file__).resolve().parents[2]
 
 
@@ -111,7 +111,7 @@ def main() -> None:
     setup_logging()
 
     p = argparse.ArgumentParser(
-        prog="tts_platform", description="Qwen3-TTS local platform"
+        prog="omnivoice_studio", description="Qwen3-TTS local platform"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 

@@ -13,7 +13,7 @@ from .http_routes import router as http_router
 from .ws_routes import get_engine as ws_get_engine
 from .ws_routes import router as ws_router
 
-log = logging.getLogger("tts_platform.api.app")
+log = logging.getLogger("omnivoice_studio.api.app")
 
 
 def create_app(cfg: AppConfig, repo_root: Path) -> FastAPI:

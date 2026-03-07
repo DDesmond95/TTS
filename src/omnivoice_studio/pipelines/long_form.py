@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
 from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
 
-log = logging.getLogger("tts_platform.pipelines.long_form")
+log = logging.getLogger("omnivoice_studio.pipelines.long_form")
 
 
 class LongFormRequest(BaseModel):

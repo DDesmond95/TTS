@@ -1,5 +1,5 @@
 [project]
-name = "qwen3-tts-platform"
+name = "omnivoice-studio"
 version = "0.1.0"
 description = "Local voice AI platform supporting Qwen3-TTS, MeanVC, TCSinger2, and VoiceSculptor with Python API, HTTP API, streaming transport, and Web UI"
 readme = "README.md"
@@ -55,7 +55,7 @@ dev = [
 ]
 
 [project.scripts]
-tts-platform = "tts_platform.cli:main"
+omnivoice-studio = "omnivoice_studio.cli:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
 from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
 
-log = logging.getLogger("tts_platform.pipelines.npc_pack")
+log = logging.getLogger("omnivoice_studio.pipelines.npc_pack")
 
 
 class NPCLine(BaseModel):

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from ..storage.outputs import RunResult
 from .base import Task
 
-log = logging.getLogger("tts_platform.tasks.custom_voice")
+log = logging.getLogger("omnivoice_studio.tasks.custom_voice")
 
 
 class CustomVoiceRequest(BaseModel):

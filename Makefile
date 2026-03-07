@@ -31,7 +31,7 @@ test:
 	pytest -q
 
 run-api:
-	tts-platform run-api --config configs/default.yaml
+	omnivoice-studio run-api --config configs/default.yaml
 
 run-ui:
-	tts-platform run-ui --config configs/default.yaml
+	omnivoice-studio run-ui --config configs/default.yaml

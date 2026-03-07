@@ -1,37 +1,43 @@
-# Qwen3-TTS Platform
+# OmniVoice Studio 🎙️✨
 
-Local-first Qwen3-TTS runner with:
+**Your Complete AI Voice Production Studio**
 
-- Python engine (`src/tts_platform/engine`)
-- HTTP API (FastAPI)
-- WebSocket streaming transport (PCM16 chunks)
-- Web UI (Gradio)
-- Voice profiles in `voices/profiles/`
-- Outputs written to `outputs/runs/`
+OmniVoice Studio is a professional-grade, local voice AI platform supporting **Qwen3-TTS**, **TCSinger2**, **VoiceSculptor**, and **MeanVC**. Designed for creators and developers, it provides studio-quality voice synthesis, cloning, and conversion with complete privacy and local control.
 
-## Quickstart (local)
+## ✨ Key Features
 
-1. Create env
+- **Multi-Model Support**: Qwen3-TTS (TTS/Clone), TCSinger2 (Singing), VoiceSculptor (Design/Edit), MeanVC (Conversion).
+- **Professional Quality**: Studio-grade audio output with advanced processing.
+- **Unified Interface**: Access all features via Python API, HTTP REST API, WebSocket Streaming, or the Web Studio UI.
+- **Local Control**: All processing is done locally on your hardware.
+- **Streaming Ready**: Ultra-low latency streaming for VTubers and real-time interactive apps.
 
-- `python -m venv .venv`
-- `source .venv/bin/activate` (Linux/macOS) / `.venv\Scripts\activate` (Windows)
+## 🚀 Quick Start
 
-2. Install (CUDA Torch)
+```bash
+# Clone and install
+git clone https://github.com/OmniVoiceStudio/omnivoice-studio.git
+cd omnivoice-studio
+pip install -e .
 
-- `pip install -r requirements.txt`
-- `pip install -e ".[dev]"`
+# Run the Studio UI
+omnivoice run-ui
+```
 
-3. Run API
+## 📚 Documentation
 
-- `tts-platform run-api --config configs/default.yaml`
+Explore our comprehensive documentation in the `docs/` folder:
 
-4. Run UI
+- **[Quickstart Guide](docs/QUICKSTART.md)** - Get up and running in minutes.
+- **[Models Overview](docs/MODELS.md)** - Learn about the supported AI models.
+- **[API Reference](docs/API.md)** - Integrate OmniVoice into your own apps.
+- **[VTuber Integration](docs/VTUBER.md)** - Setup for OBS and live streaming.
+- **[Documentation Index](docs/README.md)** - See all guides.
 
-- `tts-platform run-ui --config configs/default.yaml`
+## 📄 License
 
-## Folder layout
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-- `models/` model folders (downloaded from HF/ModelScope)
-- `voices/` reusable voice profiles and reference assets
-- `outputs/` generated audio + metadata
-- `tools/` helper scripts (not imported by app)
+---
+
+**OmniVoice Studio** - Where Your Voice Comes to Life 🎙️✨

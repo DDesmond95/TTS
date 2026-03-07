@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from ..engine.engine import TTSEngine
 
-log = logging.getLogger("tts_platform.api.ws")
+log = logging.getLogger("omnivoice_studio.api.ws")
 
 
 def get_engine() -> TTSEngine:

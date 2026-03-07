@@ -31,4 +31,4 @@ RUN mkdir -p /app/models /app/voices /app/outputs /app/configs
 
 EXPOSE 8001
 
-CMD ["python", "-m", "tts_platform.cli", "run-api", "--host", "0.0.0.0", "--port", "8001", "--config", "configs/docker.yaml"]
+CMD ["omnivoice", "run-api", "--host", "0.0.0.0", "--port", "8001", "--config", "configs/docker.yaml"]

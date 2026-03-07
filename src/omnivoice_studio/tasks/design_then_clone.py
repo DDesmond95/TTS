@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from .base import Task
 
-log = logging.getLogger("tts_platform.tasks.design_then_clone")
+log = logging.getLogger("omnivoice_studio.tasks.design_then_clone")
 
 
 class DesignThenCloneRequest(BaseModel):

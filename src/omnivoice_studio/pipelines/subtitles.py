@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
 
-log = logging.getLogger("tts_platform.pipelines.subtitles")
+log = logging.getLogger("omnivoice_studio.pipelines.subtitles")
 
 
 class Caption(BaseModel):
