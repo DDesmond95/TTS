@@ -1,34 +1,48 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ARG PRELOAD_MODELS=false
+ENV OMNIVOICE_PRELOAD=${PRELOAD_MODELS} \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    MODELS_DIR=/app/models \
+    VOICES_DIR=/app/voices \
+    OUTPUTS_DIR=/app/outputs
 
 WORKDIR /app
 
-# System deps
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     git \
   && rm -rf /var/lib/apt/lists/*
 
-# 1) Install CUDA-enabled Torch explicitly (cu121)
-# NOTE: Requires NVIDIA Container Toolkit on host + compatible driver.
+# Install CUDA-enabled Torch
 RUN python -m pip install --upgrade pip \
  && pip install --extra-index-url https://download.pytorch.org/whl/cu121 \
       torch==2.2.2+cu121 \
       torchaudio==2.2.2+cu121
 
-# 2) Install project (API extras)
-COPY pyproject.toml /app/pyproject.toml
-COPY README.md /app/README.md
+# Copy source and install project
+COPY pyproject.toml README.md /app/
 COPY src /app/src
+COPY tools /app/tools
+
 RUN pip install -e ".[api]"
 
-# Default directories (mount as volumes in production)
+# Preload models if requested
+RUN if [ "$PRELOAD_MODELS" = "true" ] ; then \
+    pip install huggingface_hub && \
+    python tools/download_models.py --all ; \
+    fi
+
+# Create persistent directories
 RUN mkdir -p /app/models /app/voices /app/outputs /app/configs
 
 EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8001/health || exit 1
 
 CMD ["omnivoice", "run-api", "--host", "0.0.0.0", "--port", "8001", "--config", "configs/docker.yaml"]

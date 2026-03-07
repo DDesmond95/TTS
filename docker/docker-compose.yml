@@ -1,43 +1,42 @@
 services:
+  # --- OmniVoice API (Local-First) ---
   api:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    image: qwen3-tts-api:local
+      args:
+        PRELOAD_MODELS: "false"
+    image: ${DOCKER_USERNAME}/${IMAGE_API}:${IMAGE_TAG}
     ports:
-      - "8001:8001"
+      - "${API_PORT}:${API_PORT}"
     volumes:
-      - ../models:/app/models
-      - ../voices:/app/voices
-      - ../outputs:/app/outputs
-      - ../configs:/app/configs
+      - ${MODELS_DIR}:/app/models
+      - ${VOICES_DIR}:/app/voices
+      - ${OUTPUTS_DIR}:/app/outputs
+      - ${CONFIGS_DIR}:/app/configs
     environment:
-      - MODELS_DIR=/app/models
-      - VOICES_DIR=/app/voices
-      - OUTPUTS_DIR=/app/outputs
-      - DEVICE=cuda:0
-      - DTYPE=float16
-    # GPU (compose v2 supports this; requires NVIDIA Container Toolkit)
+      - DEVICE=${DEVICE}
+      - DTYPE=${DTYPE}
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: ["gpu"]
 
+  # --- OmniVoice UI ---
   ui:
     build:
       context: ..
       dockerfile: docker/Dockerfile.ui
-    image: qwen3-tts-ui:local
+    image: ${DOCKER_USERNAME}/${IMAGE_UI}:${IMAGE_TAG}
     ports:
-      - "7860:7860"
+      - "${UI_PORT}:${UI_PORT}"
     depends_on:
       - api
     volumes:
-      - ../models:/app/models
-      - ../voices:/app/voices
-      - ../outputs:/app/outputs
-      - ../configs:/app/configs
+      - ${MODELS_DIR}:/app/models
+      - ${VOICES_DIR}:/app/voices
+      - ${OUTPUTS_DIR}:/app/outputs
     environment:
-      - UI_MODE=api
-      - API_URL=http://api:8001
+      - UI_MODE=${UI_MODE}
+      - API_URL=${API_URL}

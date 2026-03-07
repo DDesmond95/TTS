@@ -1,63 +1,55 @@
-# Docker
+# 🐳 Docker Deployment
 
-This project supports:
+OmniVoice Studio provides a flexible Docker architecture supporting both lightweight development and production-ready "all-in-one" deployments.
 
-- API container
-- UI container
-- optional all-in-one container
+## 🚀 Image Variants
 
-## Images
+We maintain two primary variants for the API:
 
-1. api
+1.  **Lite (`:lite` / `:latest`)**: Contains the engine code and dependencies. Requires you to mount your `models/` directory externally.
+2.  **Full (`:full`)**: A complete image with all AI weights pre-loaded. Perfect for stateless cloud deployments where you don't want to manage external storage.
 
-- Runs FastAPI (uvicorn)
-- Exposes ports: 8001
-- Mounts:
-  - /app/models
-  - /app/voices
-  - /app/outputs
+## 🛠️ Docker Compose (Local Development)
 
-2. ui
+The easiest way to run OmniVoice Studio locally is using `docker-compose`. Ensure you have an `.env` file configured.
 
-- Runs Gradio/Streamlit
-- Exposes ports: 7860
-- Either calls local engine (not recommended in container) or calls API
+```bash
+cd docker
+docker-compose up -d
+```
 
-## GPU runtime
+This will start:
 
-Recommended:
+- **API**: On port `8001` (Lite mode, mounting local `models/`).
+- **UI**: On port `7860`.
 
-- NVIDIA Container Toolkit
-- Run with GPU access:
-  - docker run --gpus all ...
+## 🔋 GPU Support
 
-If no GPU is available:
+To utilize high-speed neural synthesis, you **must** have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on your host.
 
-- run CPU mode (slow) for basic testing
+The `docker-compose.yml` is pre-configured to reserve all available GPUs.
 
-## VTuber note (host audio)
+## 📥 Building Images Manually
 
-If you want to route streamed audio into OBS/VSeeFace on the host OS:
+### Build Lite API (Default)
 
-- run the API server in Docker (fine)
-- run the streaming “bridge player” on the host OS (recommended)
+```bash
+docker build -t omnivoice-studio-api:lite -f docker/Dockerfile.api .
+```
 
-Reason:
+### Build Full API (Pre-loaded Models)
 
-- accessing host audio devices from inside Docker is platform-specific and usually not worth the complexity for VTuber workflows.
+```bash
+docker build --build-arg PRELOAD_MODELS=true -t omnivoice-studio-api:full -f docker/Dockerfile.api .
+```
 
-## Example run
+## 💓 Health & Monitoring
 
-API:
+Both the API and UI images include built-in `HEALTHCHECK` instructions. orchestration tools like Kubernetes or Docker Swarm will automatically detect if the service is ready or struggling:
 
-- docker run --gpus all -p 8001:8001 \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/voices:/app/voices \
-  -v $(pwd)/outputs:/app/outputs \
-  omnivoice/omnivoice-studio:tag
+- **API Health**: `curl -f http://localhost:8001/health`
+- **UI Health**: `curl -f http://localhost:7860/`
 
-UI (calling API):
+## 🎙️ VTuber & Host Audio Note
 
-- docker run -p 7860:7860 \
-  -e API_URL=http://host.docker.internal:8001 \
-  omnivoice/youruiimage:tag
+When running in Docker, it is recommended to run the **Streaming Bridge** (Python/Batch) on your **Host OS** while the API runs in Docker. This simplifies routing audio to virtual cables (VAC) for OBS or VSeeFace.

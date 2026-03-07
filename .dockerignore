@@ -27,6 +27,12 @@ outputs/*.mp3
 voices/refs
 voices/prompts
 
+# Reference Repos (Reference only, not for production build)
+Qwen3-TTS
+MeanVC
+TCSinger2
+VoiceSculptor
+
 # Docs build artifacts (if you add them later)
 site
 htmlcov

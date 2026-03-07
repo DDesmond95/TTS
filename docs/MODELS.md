@@ -6,22 +6,25 @@ Expected layout (example):
 
 ```
 models/
-  qwen3/
-    Qwen3-TTS-Tokenizer-12Hz/
-    Qwen3-TTS-12Hz-0.6B-Base/
-    Qwen3-TTS-12Hz-0.6B-CustomVoice/
-    Qwen3-TTS-12Hz-1.7B-Base/
-    Qwen3-TTS-12Hz-1.7B-CustomVoice/
-    Qwen3-TTS-12Hz-1.7B-VoiceDesign/
+  # Qwen3-TTS (Direct folders)
+  Qwen3-TTS-Tokenizer-12Hz/
+  Qwen3-TTS-12Hz-0.6B-Base/
+  Qwen3-TTS-12Hz-0.6B-CustomVoice/
+  ...
 
-  meanvc/
-    checkpoints/
+  # MeanVC
+  MeanVC/
+    model_200ms.safetensors
+    vocos.pt
+    ...
 
-  tcsinger2/
-    checkpoints/
+  # VoiceSculptor
+  VoiceSculptor-VD/
+  xcodec2/
 
-  voicesculptor/
-    checkpoints/
+  # TCSinger2 Dependencies
+  TCSinger2/
+    flan-t5-large/
 ```
 
 Notes:

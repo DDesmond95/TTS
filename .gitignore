@@ -30,3 +30,9 @@ build/
 *.egg-info/
 
 models/*
+
+# Reference Repos (Local reference only, not committed)
+Qwen3-TTS/
+MeanVC/
+TCSinger2/
+VoiceSculptor/

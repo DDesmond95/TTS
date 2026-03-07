@@ -3,21 +3,35 @@ import argparse
 import os
 from pathlib import Path
 
-REQUIRED_SUBDIRS = [
+# Package-level models
+QWEN3_REQUIRED = [
     "Qwen3-TTS-Tokenizer-12Hz",
     "Qwen3-TTS-12Hz-0.6B-Base",
     "Qwen3-TTS-12Hz-0.6B-CustomVoice",
 ]
 
-OPTIONAL_SUBDIRS = [
+QWEN3_OPTIONAL = [
     "Qwen3-TTS-12Hz-1.7B-Base",
     "Qwen3-TTS-12Hz-1.7B-CustomVoice",
     "Qwen3-TTS-12Hz-1.7B-VoiceDesign",
 ]
 
+SCULPTOR_REQUIRED = [
+    "VoiceSculptor-VD",
+    "xcodec2",
+]
+
+# Component-specific models (inside models dir)
+MEANVC_REQUIRED_FILES = [
+    "MeanVC/model_200ms.safetensors",
+    "MeanVC/vocos.pt",
+]
+
 
 def dir_size_bytes(path: Path) -> int:
     total = 0
+    if path.is_file():
+        return path.stat().st_size
     for p in path.rglob("*"):
         if p.is_file():
             try:
@@ -38,45 +52,57 @@ def human(n: int) -> str:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Verify local models directory contents.")
+    ap = argparse.ArgumentParser(
+        description="Verify local models for all OmniVoice Studio components."
+    )
     ap.add_argument("--models-dir", default=os.getenv("MODELS_DIR", "./models"))
     ap.add_argument(
         "--require-17b", action="store_true", help="Fail if 1.7B models not present."
     )
     args = ap.parse_args()
 
+    repo_root = Path(__file__).resolve().parents[1]
     models_dir = Path(args.models_dir).resolve()
     print(f"[info] models_dir = {models_dir}")
 
-    required = REQUIRED_SUBDIRS + (OPTIONAL_SUBDIRS if args.require_17b else [])
-    missing: list[str] = []
-    present: list[tuple[str, str]] = []
+    all_ok = True
 
-    for name in required:
+    # 1. Qwen3-TTS
+    print("\n[Qwen3-TTS]")
+    qwen_list = QWEN3_REQUIRED + (QWEN3_OPTIONAL if args.require_17b else [])
+    for name in qwen_list:
         d = models_dir / name
         if not d.exists():
-            missing.append(name)
+            print(f"  [MISSING] {name}")
+            all_ok = False
         else:
-            present.append((name, human(dir_size_bytes(d))))
+            print(f"  [OK] {name} ({human(dir_size_bytes(d))})")
 
-    if present:
-        print("\n[present]")
-        for name, size in present:
-            print(f"  - {name}: {size}")
+    # 2. VoiceSculptor
+    print("\n[VoiceSculptor]")
+    for name in SCULPTOR_REQUIRED:
+        d = models_dir / name
+        if not d.exists():
+            print(f"  [MISSING] {name}")
+            all_ok = False
+        else:
+            print(f"  [OK] {name} ({human(dir_size_bytes(d))})")
 
-    if not args.require_17b:
-        print("\n[optional]")
-        for name in OPTIONAL_SUBDIRS:
-            d = models_dir / name
-            print(f"  - {name}: {'OK' if d.exists() else 'missing'}")
+    # 3. MeanVC
+    print("\n[MeanVC]")
+    for rel_path in MEANVC_REQUIRED_FILES:
+        p = models_dir / rel_path
+        if not p.exists():
+            print(f"  [MISSING] {rel_path} (expected in {models_dir})")
+            all_ok = False
+        else:
+            print(f"  [OK] {rel_path} ({human(dir_size_bytes(p))})")
 
-    if missing:
-        print("\n[missing required]")
-        for m in missing:
-            print(f"  - {m}")
-        raise SystemExit(2)
+    if not all_ok:
+        print("\n[error] some required models are missing.")
+        raise SystemExit(1)
 
-    print("\n[done] required models present")
+    print("\n[done] all required models present for the selected profile.")
 
 
 if __name__ == "__main__":
