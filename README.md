@@ -34,6 +34,16 @@ Explore our comprehensive documentation in the `docs/` folder:
 - **[VTuber Integration](docs/VTUBER.md)** - Setup for OBS and live streaming.
 - **[Documentation Index](docs/README.md)** - See all guides.
 
+## 🧹 Code Quality
+
+We maintain high standards for our codebase. Developers should use the following commands regularly:
+
+- `make lint` / `make format`: Quick linting with Ruff.
+- `make pylint`: Static analysis of code health.
+- `make pylint-report`: Generate a Pylint report to a file.
+- `make type`: Check types with MyPy.
+- `make test`: Run the test suite.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -6,14 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
+from .utils import check_websockets
+
 
 async def run(ws_url: str, payload: dict, out_path: Path) -> None:
-    try:
-        import websockets  # type: ignore
-    except ImportError:
-        raise SystemExit(
-            "Missing dependency: websockets. Install with: pip install websockets"
-        ) from None
+    websockets = check_websockets()
 
     header = None
     chunks = []

@@ -1,3 +1,5 @@
+"""NPC pack pipeline for batch vocal performance generation."""
+
 from __future__ import annotations
 
 import csv
@@ -8,19 +10,23 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
-from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+from ..storage.outputs import RunResult
+from .base import PipelineHelper
 
 log = logging.getLogger("omnivoice_studio.pipelines.npc_pack")
 
 
 class NPCLine(BaseModel):
+    """Represents a single dialogue line for an NPC."""
+
     character_id: str
     text: str
     line_id: str
 
 
 class NPCPackRequest(BaseModel):
+    """Configuration for an NPC pack generation run."""
+
     csv_path: str
     speaker_map: dict[str, dict[str, Any]]
     model: str | None = None
@@ -28,7 +34,19 @@ class NPCPackRequest(BaseModel):
 
 
 class NPCPackPipeline:
-    async def run(self, engine: Any, request: NPCPackRequest) -> Any:
+    """Pipeline for generating batches of NPC voice clips from a CSV script."""
+
+    async def run(self, engine: Any, request: NPCPackRequest) -> RunResult:
+        """
+        Executes the NPC pack pipeline.
+
+        Args:
+            engine: The TTSEngine instance.
+            request: The NPCPackRequest configuration.
+
+        Returns:
+            A RunResult object describing the batch outputs.
+        """
         # 1. Read CSV
         lines = self._read_csv(request.csv_path)
         log.info("Processing %d lines for NPC pack", len(lines))
@@ -38,8 +56,6 @@ class NPCPackPipeline:
         manifest = []
 
         for line in lines:
-            task: Any
-            task_req: Any
             speaker_config = request.speaker_map.get(line.character_id)
             if not speaker_config:
                 log.warning("Unknown character_id: %s, skipping", line.character_id)
@@ -49,75 +65,63 @@ class NPCPackPipeline:
             char_dir = run_dir / line.character_id
             char_dir.mkdir(parents=True, exist_ok=True)
 
-            task_type = speaker_config.get("type", "custom_voice")
-            if task_type == "custom_voice":
-                task = CustomVoiceTask()
-                task_req = CustomVoiceRequest(
-                    text=line.text,
-                    language=speaker_config.get("language", "Auto"),
-                    speaker=speaker_config.get("speaker", "Ryan"),
-                    instruct=speaker_config.get("instruct", ""),
-                    model=request.model or speaker_config.get("model"),
-                    gen=request.gen,
-                )
-            else:
-                task = VoiceCloneTask()
-                task_req = VoiceCloneRequest(
-                    text=line.text,
-                    language=speaker_config.get("language", "Auto"),
-                    voice_profile=speaker_config.get("voice_profile"),
-                    model=request.model or speaker_config.get("model"),
-                    gen=request.gen,
-                )
-
+            task, task_req = PipelineHelper.prepare_task_from_config(
+                speaker_config, line.text, request.model, request.gen
+            )
             res = await task.run(engine, task_req)
 
             # Move/Rename audio to the character folder
             target_name = f"{line.line_id}.wav"
             target_path = char_dir / target_name
             if res.audio_path and res.audio_path.exists():
-                 target_path.write_bytes(res.audio_path.read_bytes())
+                target_path.write_bytes(res.audio_path.read_bytes())
 
-            manifest.append({
-                "character_id": line.character_id,
-                "line_id": line.line_id,
-                "text": line.text,
-                "path": f"{line.character_id}/{target_name}"
-            })
+            manifest.append(
+                {
+                    "character_id": line.character_id,
+                    "line_id": line.line_id,
+                    "text": line.text,
+                    "path": f"{line.character_id}/{target_name}",
+                }
+            )
 
         # 2. Save Manifest
         manifest_path = run_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
         engine.outputs.write_params(run_dir, request.model_dump())
 
         meta = {
             "total_lines": len(manifest),
-            "characters": list(request.speaker_map.keys())
+            "characters": list(request.speaker_map.keys()),
         }
         engine.outputs.write_meta(run_dir, meta)
 
-        from ..storage.outputs import RunResult
         return RunResult(
             run_id=run_id,
             run_dir=run_dir,
-            audio_path=None, # Multiple files
+            audio_path=None,  # Multiple files
             sample_rate=None,
             meta=meta,
         )
 
     def _read_csv(self, path: str) -> list[NPCLine]:
+        """Reads dialogue lines from a CSV file."""
         p = Path(path)
         if not p.exists():
             return []
 
         lines: list[NPCLine] = []
-        with open(p, encoding='utf-8') as f:
+        with open(p, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                lines.append(NPCLine(
-                    character_id=row['character_id'],
-                    text=row['text'],
-                    line_id=row.get('line_id', f"line_{len(lines)}")
-                ))
+                lines.append(
+                    NPCLine(
+                        character_id=row["character_id"],
+                        text=row["text"],
+                        line_id=row.get("line_id", f"line_{len(lines)}"),
+                    )
+                )
         return lines

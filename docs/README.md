@@ -70,6 +70,9 @@ Constraints:
   - VoiceDesign
   - VoiceClone (Base)
   - DesignThenClone (pipeline)
+  - VoiceConversion (MeanVC)
+  - SingingSynthesis (TCSinger2)
+  - VoiceSculpt (VoiceSculptor)
   - Tokenizer Encode/Decode
 
 3. Pipelines

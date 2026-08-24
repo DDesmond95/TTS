@@ -1,17 +1,23 @@
+"""Task implementation for Voice Design followed by Voice Clone in one workflow."""
+
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
-import numpy as np
 from pydantic import BaseModel, Field
 
+from ..storage.outputs import RunResult
 from .base import Task
+from .voice_design import VoiceDesignRequest, VoiceDesignTask
 
 log = logging.getLogger("omnivoice_studio.tasks.design_then_clone")
 
 
 class DesignThenCloneRequest(BaseModel):
+    """Request schema for design-then-clone workflow."""
+
     design_text: str
     design_language: str = "Auto"
     design_instruct: str = ""
@@ -23,13 +29,16 @@ class DesignThenCloneRequest(BaseModel):
     gen_clone: dict[str, Any] = Field(default_factory=dict)
 
 
-class DesignThenCloneTask(Task[DesignThenCloneRequest, Any]):
+class DesignThenCloneTask(Task[DesignThenCloneRequest, RunResult]):
+    """Executes a two-step generation: first design a voice, then clone it immediately."""
+
     def validate(self, request: DesignThenCloneRequest) -> DesignThenCloneRequest:
+        """Validate the incoming request parameters."""
         return request
 
-    async def run(self, engine: Any, request: DesignThenCloneRequest) -> Any:
+    async def run(self, engine: Any, request: DesignThenCloneRequest) -> RunResult:
+        """Execute the design-then-clone task."""
         # Step 1: Design
-        from .voice_design import VoiceDesignRequest, VoiceDesignTask
         design_task = VoiceDesignTask()
         design_req = VoiceDesignRequest(
             text=request.design_text,
@@ -41,14 +50,11 @@ class DesignThenCloneTask(Task[DesignThenCloneRequest, Any]):
         design_res = await design_task.run(engine, design_req)
 
         # Step 2: Build clone prompt in-memory and then clone
-        import asyncio
+        base_id_or_path = engine.resolve_model(request.base_model, expected_kind="base")
 
-
-        base_id_or_path = engine._resolve_model(request.base_model, expected_kind="base")
-
-        async with engine._sem:
+        async with engine.sem:
             base_obj = await asyncio.to_thread(
-                engine._get_or_load, base_id_or_path, "base"
+                engine.get_or_load, base_id_or_path, "base"
             )
 
             if not design_res.audio_path:
@@ -69,9 +75,9 @@ class DesignThenCloneTask(Task[DesignThenCloneRequest, Any]):
                 **request.gen_clone,
             )
 
-        run_id, run_dir = engine.outputs.new_run_dir("design_then_clone")
-        engine.outputs.write_params(
-            run_dir,
+        run_id, run_dir = self._prepare_run(
+            engine,
+            "design_then_clone",
             {
                 "task": "design_then_clone",
                 "voicedesign_run_id": design_res.run_id,
@@ -87,33 +93,4 @@ class DesignThenCloneTask(Task[DesignThenCloneRequest, Any]):
             },
         )
 
-        audio_paths = []
-        for i, w in enumerate(wavs):
-            audio_paths.append(
-                engine.outputs.save_wav(
-                    run_dir, np.asarray(w), int(sr), filename=f"audio_{i}.wav"
-                )
-            )
-
-        meta = {
-            "sample_rate": int(sr),
-            "count": len(audio_paths),
-            "files": [p.name for p in audio_paths],
-        }
-        engine.outputs.write_meta(run_dir, meta)
-
-        audio_path = None
-        if len(audio_paths) == 1:
-            audio_path = audio_paths[0]
-            if audio_path.name != "audio.wav":
-                (run_dir / "audio.wav").write_bytes(audio_path.read_bytes())
-                audio_path = (run_dir / "audio.wav").resolve()
-
-        from ..storage.outputs import RunResult
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
-            sample_rate=int(sr),
-            meta=meta,
-        )
+        return engine.outputs.complete_run(run_id, run_dir, wavs, sr)

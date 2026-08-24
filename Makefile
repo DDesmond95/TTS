@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format type test run-api run-ui
+.PHONY: help install install-dev lint format type test run-api run-ui pylint pylint-report
 
 help:
 	@echo "Targets:"
@@ -10,6 +10,8 @@ help:
 	@echo "  test         Pytest"
 	@echo "  run-api      Run FastAPI server"
 	@echo "  run-ui       Run Gradio UI"
+	@echo "  pylint       Run Pylint (quick check)"
+	@echo "  pylint-report Run Pylint and save colorized report to file"
 
 install:
 	pip install -r requirements.txt
@@ -31,7 +33,14 @@ test:
 	pytest -q
 
 run-api:
-	omnivoice-studio run-api --config configs/default.yaml
+	omnivoice run-api --config configs/default.yaml
 
 run-ui:
-	omnivoice-studio run-ui --config configs/default.yaml
+	omnivoice run-ui --config configs/default.yaml
+
+pylint:
+	pylint src --rcfile .pylintrc
+
+pylint-report:
+	pylint src --rcfile .pylintrc > pylint_report.txt 2>&1
+	@echo "Report saved to pylint_report.txt"

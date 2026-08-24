@@ -1,47 +1,62 @@
-# CLI
+# ⌨️ OmniVoice Studio CLI Reference
 
-The CLI is used for:
+The unified `omnivoice` command is your primary tool for managing the studio, processing audio, and running servers.
 
-- running API/UI
-- managing models
-- quick generation tests
-- streaming test client
-- tokenizer utilities
+## 🚀 Server Commands
 
-Recommended commands:
+### Run Web Studio UI
 
-Run:
+`omnivoice run-ui [--host 0.0.0.0] [--port 7860] [--config configs/default.yaml]`
 
-- run-api --host 0.0.0.0 --port 8001
-- run-ui --host 0.0.0.0 --port 7860 [--api-url ...]
+### Run HTTP API
 
-Models:
+`omnivoice run-api [--host 0.0.0.0] [--port 8001] [--config configs/default.yaml]`
 
-- download-models [--all] [--models-dir ...]
-- list-models
-- warmup --model <name>
+---
 
-Voices:
+## 📦 Model & Voice Management
 
-- list-voices
-- add-voice --profile <json>
-- build-clone-prompt --voice-id <id>
+### List Local Models
 
-Generate (one-shot):
+`omnivoice list-models` -- Scans your models directory and displays categories.
 
-- tts-custom --text "..." --speaker Vivian --language Chinese
-- tts-clone --voice-id my_clone_speaker_01 --text "..."
+### List Voice Profiles
 
-Streaming test:
+`omnivoice list-voices` -- Displays all saved voice clones and templates.
 
-- stream-custom --text "..." ...
+### Download Models
 
-Tokenizer:
+`omnivoice download-models [--include-17b] [--only model_id]`
 
-- encode --input <wav>
-- decode --input <codes.json>
+---
 
-VTuber utilities:
+## 🎙️ Inference Tasks (One-Shot)
 
-- stream-player --ws-url <...> --device "<output device name>" [--chunk-buffer-ms 200]
-- hotkey-tts --ws-url <...> --device "<output device name>" [--clipboard]
+### Text-to-Speech (Qwen3-TTS)
+
+`omnivoice synthesize "Hello from the CLI!" [--speaker Ryan] [--language Auto]`
+
+### Voice Conversion (MeanVC)
+
+`omnivoice convert path/to/source.wav path/to/target.wav [--model meanvc_checkpoints]`
+
+---
+
+## 🛠️ Advanced Usage
+
+### Global Options
+
+- `--config`: Path to your YAML configuration file (default: `configs/default.yaml`).
+
+### Tokenizer Utilities
+
+- `omnivoice encode path/to/audio.wav` -- Convert audio to discrete codes.
+- `omnivoice decode path/to/codes.json` -- Reconstruct audio from codes.
+
+---
+
+## 📜 Logs & Debugging
+
+The CLI automatically routes logs to the console. Use environment variables for more control:
+
+- `LOG_LEVEL=DEBUG omnivoice run-ui`

@@ -1,56 +1,54 @@
-# Troubleshooting
+# 🛠️ OmniVoice Studio: Troubleshooting Guide
 
-## CUDA not available
+If you encounter issues, please check the **detailed error handling guide** for specific exception definitions:
+👉 **[Error Handling & Troubleshooting Deep Dive](../error_handling_guide.md)**
 
-Symptoms:
+---
 
-- torch.cuda.is_available() == False
+## ⚡ Critical & Startup Issues
 
-Fix:
+### CUDA not available
 
-- install CUDA-enabled torch
-- verify NVIDIA driver
-- verify nvidia-smi
+- **Symptoms**: `torch.cuda.is_available() == False` or models falling back to CPU.
+- **Fix**:
+  - Install CUDA-enabled PyTorch: `pip install torch --index-url https://download.pytorch.org/whl/cu121`
+  - Verify NVIDIA drivers by running `nvidia-smi` in your terminal.
 
-## Out of memory (OOM)
+### Out of Memory (OOM)
 
-Fix:
+- **Fix**:
+  - Use **FP16** or **BF16** in `configs/default.yaml`.
+  - Set `MODEL_CACHE_SIZE: 1`.
+  - Prefer **0.6B models** for GPUs with less than 8GB VRAM.
+  - Disable sliding window attention if supported.
 
-- use fp16
-- set concurrency = 1
-- reduce max_new_tokens
-- prefer 0.6B models
-- ensure only one model loaded
+### Slow Generation / High Latency
 
-## Slow first request
+- **Fix**:
+  - Warm up the model using the CLI or UI "Model Choices" toggle.
+  - Ensure your system memory isn't filled by other apps (e.g., Chrome).
+  - Use **FlashAttention** if your hardware supports it (`attn_implementation: flash_attention_2`).
 
-Fix:
+---
 
-- warmup model
-- keep model loaded (cache size 1)
+## 🎙️ Audio & Streaming Issues
 
-## Streaming audio glitches
+### Streaming Glitches or Crackling
 
-Fix:
+- **Fix**:
+  - Increase the `chunk_ms` in the streaming settings (e.g., from 60 to 80).
+  - Confirm the client sample rate matches the model output (usually 24000Hz or 44100Hz).
+  - Reduce system load.
 
-- ensure client handles PCM16 correctly
-- confirm sample rate from header
-- increase chunk size (ms) slightly
+### No Audio in OBS / VSeeFace
 
-## VTuber / OBS issues
+- **Fix**:
+  - **OBS**: Verify the "Audio Input Capture" is set to your Virtual Audio Cable output.
+  - **VSeeFace**: Set "Microphone" to the same virtual device where OmniVoice is playing.
+  - **Gain**: If mouth movement is absent, increase input gain in VSeeFace or the OmniVoice output volume.
 
-No audio in OBS:
+---
 
-- verify OBS is capturing the virtual device (Audio Input Capture)
-- confirm the bridge player is outputting to the virtual device
+## 📜 Error Logs
 
-No mouth movement in VSeeFace:
-
-- set microphone input to the same virtual device output/monitor
-- increase input gain; confirm meter activity
-
-Crackling:
-
-- raise chunk_ms (e.g., 60 -> 80)
-- increase client buffer (e.g., 150ms -> 250ms)
-- ensure MAX_CONCURRENT_JOBS=1
+If a task fails, the **"Response / Metadata"** box in the UI will provide a detailed JSON error. Always include this when reporting issues.

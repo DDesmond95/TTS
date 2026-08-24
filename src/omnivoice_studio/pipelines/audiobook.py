@@ -1,3 +1,5 @@
+"""Audiobook generation pipeline for OmniVoice Studio."""
+
 from __future__ import annotations
 
 import logging
@@ -5,23 +7,36 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, Field
+import soundfile as sf
 
+from ..storage.outputs import RunResult
+from .base import BasePipelineRequest, PipelineHelper
 from .long_form import LongFormPipeline, LongFormRequest
 
 log = logging.getLogger("omnivoice_studio.pipelines.audiobook")
 
-class AudiobookRequest(BaseModel):
+
+class AudiobookRequest(BasePipelineRequest):
+    """Configuration for an audiobook generation run."""
+
     chapter_paths: list[str]
-    task_type: str = "custom_voice"
-    speaker: str = "Ryan" # Default speaker for the narrator
-    language: str = "Auto"
-    model: str | None = None
-    gen: dict[str, Any] = Field(default_factory=dict)
     merge_all: bool = True
 
+
 class AudiobookPipeline:
-    async def run(self, engine: Any, request: AudiobookRequest) -> Any:
+    """Pipeline for generating audiobooks by processing multiple chapter files."""
+
+    async def run(self, engine: Any, request: AudiobookRequest) -> RunResult:
+        """
+        Executes the audiobook pipeline.
+
+        Args:
+            engine: The TTSEngine instance.
+            request: The AudiobookRequest configuration.
+
+        Returns:
+            A RunResult object.
+        """
         long_form = LongFormPipeline()
         chapter_results = []
 
@@ -32,7 +47,7 @@ class AudiobookPipeline:
                 continue
 
             text = p.read_text(encoding="utf-8")
-            log.info("Processing chapter %d: %s", i+1, p.name)
+            log.info("Processing chapter %d: %s", i + 1, p.name)
 
             # Reuse LongFormPipeline logic for each chapter
             lf_req = LongFormRequest(
@@ -41,7 +56,7 @@ class AudiobookPipeline:
                 speaker=request.speaker,
                 language=request.language,
                 model=request.model,
-                gen=request.gen
+                gen=request.gen,
             )
             res = await long_form.run(engine, lf_req)
             chapter_results.append(res)
@@ -50,7 +65,6 @@ class AudiobookPipeline:
         combined_wav = []
         sample_rate = 24000
 
-        import soundfile as sf
         for res in chapter_results:
             wav, sr = sf.read(str(res.audio_path))
             sample_rate = sr
@@ -58,27 +72,23 @@ class AudiobookPipeline:
             # Add small silence between chapters
             combined_wav.append(np.zeros(int(sr * 2.0)))
 
-        run_id, run_dir = engine.outputs.new_run_dir("audiobook")
-
-        if request.merge_all and combined_wav:
-            merged = np.concatenate(combined_wav)
-            audio_path = engine.outputs.save_wav(run_dir, merged, sample_rate, filename="full_book.wav")
-        else:
-            audio_path = None
-
-        meta = {
+        # 3. Finalize
+        meta_extra = {
             "chapters_processed": len(chapter_results),
-            "sample_rate": sample_rate,
-            "chapter_ids": [r.run_id for r in chapter_results]
+            "chapter_ids": [r.run_id for r in chapter_results],
         }
-        engine.outputs.write_meta(run_dir, meta)
-        engine.outputs.write_params(run_dir, request.model_dump())
 
-        from ..storage.outputs import RunResult
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
+        merged_wav = (
+            np.concatenate(combined_wav)
+            if (request.merge_all and combined_wav)
+            else np.zeros(0)
+        )
+
+        return PipelineHelper.finalize_run(
+            engine,
+            run_name="audiobook",
+            combined_wav=merged_wav,
             sample_rate=sample_rate,
-            meta=meta
+            params=request.model_dump(),
+            meta_extra=meta_extra,
         )

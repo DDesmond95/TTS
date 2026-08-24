@@ -29,6 +29,17 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: Pylint (static analysis)
+        run: |
+          pylint src --rcfile .pylintrc > pylint_report.txt 2>&1 || true
+          pylint src --rcfile .pylintrc --fail-under=7.0
+
+      - name: Upload Pylint Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pylint-report
+          path: pylint_report.txt
+
       - name: MyPy (type check)
         run: |
           mypy src

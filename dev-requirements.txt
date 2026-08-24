@@ -4,6 +4,8 @@ jupyterlab
 
 pytest
 ruff
+pylint
 mypy
 types-PyYAML
 types-requests
+codespell

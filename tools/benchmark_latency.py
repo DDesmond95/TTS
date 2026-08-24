@@ -5,34 +5,11 @@ import json
 import time
 from statistics import mean, median
 
+from .utils import ws_run_task
+
 
 async def one_run(ws_url: str, payload: dict) -> tuple[float, float]:
-    try:
-        import websockets  # type: ignore
-    except ImportError:
-        raise SystemExit(
-            "Missing dependency: websockets. Install with: pip install websockets"
-        ) from None
-
-    t0 = time.time()
-    t_first = None
-
-    async with websockets.connect(ws_url, max_size=None) as ws:
-        await ws.send(json.dumps({"type": "start", **payload}))
-        while True:
-            msg = await ws.recv()
-            if isinstance(msg, bytes):
-                if t_first is None:
-                    t_first = time.time()
-                continue
-            obj = json.loads(msg)
-            if obj.get("type") == "end":
-                t_end = time.time()
-                break
-
-    if t_first is None:
-        t_first = t_end
-    return (t_first - t0), (t_end - t0)
+    return await ws_run_task(ws_url, payload)
 
 
 def main() -> None:

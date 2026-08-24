@@ -19,6 +19,8 @@ dependencies = [
   "uvicorn[standard]",
   "pydantic",
   "gradio",
+  "omegaconf",
+  "vocos",
 
   # audio / ML runtime
   "torch",
@@ -37,11 +39,13 @@ ui = [
 voice_conversion = [
   "torch",
   "torchaudio",
+  "vocos",
 ]
 
 singing = [
   "torch",
   "torchaudio",
+  "omegaconf",
 ]
 dev = [
   "pytest",
@@ -55,7 +59,7 @@ dev = [
 ]
 
 [project.scripts]
-omnivoice-studio = "omnivoice_studio.cli:main"
+omnivoice = "omnivoice_studio.cli:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -82,3 +86,19 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[tool.codespell]
+skip = [
+  ".git",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".venv",
+  "build",
+  "dist",
+  "*.ipynb",
+]
+ignore-words-list = [
+  "nd",
+  "te",
+]

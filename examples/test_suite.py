@@ -1,9 +1,10 @@
 import argparse
 import asyncio
 import logging
-import os
 import sys
 from pathlib import Path
+
+from huggingface_hub import snapshot_download
 
 # Setup simple logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -13,8 +14,6 @@ logger = logging.getLogger("ExampleSuite")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 sys.path.append(str(ROOT / "src"))
-
-from huggingface_hub import snapshot_download
 
 
 def ensure_dir(d):

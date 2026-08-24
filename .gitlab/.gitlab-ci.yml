@@ -24,7 +24,14 @@ lint:
     - pip install -e ".[dev]"
     - ruff check .
     - ruff format --check .
+    - pylint src --rcfile .pylintrc > pylint_report.txt 2>&1 || true
+    - pylint src --rcfile .pylintrc --fail-under=7.0
     - mypy src
+  artifacts:
+    when: always
+    paths:
+      - pylint_report.txt
+    expire_in: 1 week
 
 # --- Testing Stage ---
 test:

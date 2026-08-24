@@ -61,7 +61,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    repo_root = Path(__file__).resolve().parents[1]
+    _repo_root = Path(__file__).resolve().parents[1]
     models_dir = Path(args.models_dir).resolve()
     print(f"[info] models_dir = {models_dir}")
 

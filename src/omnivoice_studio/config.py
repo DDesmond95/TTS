@@ -1,3 +1,5 @@
+"""Configuration management for OmniVoice Studio, supporting YAML and ENV overrides."""
+
 from __future__ import annotations
 
 import os
@@ -10,6 +12,8 @@ import yaml
 
 @dataclass
 class RuntimeConfig:
+    """Configuration for the model inference runtime."""
+
     device: str = "cuda:0"
     dtype: str = "float16"
     max_concurrent_jobs: int = 1
@@ -23,9 +27,21 @@ class RuntimeConfig:
     attn_implementation: str | None = None
     disable_sliding_window: bool = False
 
+    @property
+    def torch_dtype(self) -> str:
+        """Returns the appropriate torch dtype string."""
+        d = self.dtype.lower()
+        if d in ("float16", "fp16"):
+            return "float16"
+        if d in ("bfloat16", "bf16"):
+            return "bfloat16"
+        return "float32"
+
 
 @dataclass
 class ApiConfig:
+    """Configuration for the HTTP/WebSocket API server."""
+
     host: str = "0.0.0.0"
     port: int = 8001
     cors_origins: list[str] = field(default_factory=list)
@@ -34,6 +50,8 @@ class ApiConfig:
 
 @dataclass
 class UiConfig:
+    """Configuration for the Gradio UI."""
+
     host: str = "0.0.0.0"
     port: int = 7860
     mode: str = "local_engine"  # local_engine | api
@@ -42,6 +60,8 @@ class UiConfig:
 
 @dataclass
 class PathsConfig:
+    """Configuration for various filesystem paths."""
+
     models_dir: str = "./models"
     voices_dir: str = "./voices"
     outputs_dir: str = "./outputs"
@@ -50,23 +70,16 @@ class PathsConfig:
 
 @dataclass
 class AppConfig:
+    """Root configuration object containing all sub-configs."""
+
     paths: PathsConfig
     runtime: RuntimeConfig
     api: ApiConfig
     ui: UiConfig
 
 
-def _deep_merge(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
-    out = dict(a)
-    for k, v in b.items():
-        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
-
-
 def _apply_env_overrides(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Applies environment variable overrides to the config dictionary."""
     # Paths
     cfg.setdefault("paths", {})
     cfg["paths"]["models_dir"] = os.getenv(
@@ -123,6 +136,15 @@ def _apply_env_overrides(cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_config(config_path: str | Path) -> AppConfig:
+    """
+    Loads configuration from a YAML file and applies environment overrides.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        A fully initialized AppConfig object.
+    """
     p = Path(config_path).resolve()
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict):

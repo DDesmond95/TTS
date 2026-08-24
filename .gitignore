@@ -36,3 +36,29 @@ Qwen3-TTS/
 MeanVC/
 TCSinger2/
 VoiceSculptor/
+
+# Pylint & Linter Reports
+pylint_report.txt
+report.json
+report_colored.txt
+!.codespellrc
+
+# Environment
+.env
+.python-version
+.conda/
+conda-env.yml
+
+# Asset folders
+outputs/
+!outputs/.gitkeep
+voices/refs/
+!voices/refs/.gitkeep
+voices/prompts/
+!voices/prompts/.gitkeep
+models/
+!models/.gitkeep
+.bmad-loop/runs/
+.bmad-loop/cache/
+.bmad-loop/policy.toml
+_bmad/render/

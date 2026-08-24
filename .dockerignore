@@ -33,6 +33,23 @@ MeanVC
 TCSinger2
 VoiceSculptor
 
-# Docs build artifacts (if you add them later)
+# Environment
+.env
+.python-version
+.conda
+conda-env.yml
+
+# Asset folders (Do not package into image)
+outputs
+voices/refs
+voices/prompts
+models
+
+# Pylint & Linter Reports
+pylint_report.txt
+report.json
+report_colored.txt
+
+# Docs build artifacts
 site
 htmlcov

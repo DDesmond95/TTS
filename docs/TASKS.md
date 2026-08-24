@@ -121,85 +121,43 @@ Voice conversion transforms **input speech into a target voice** while preservin
 
 Inputs:
 
-- `source_audio`
-  - path / upload / array
-
-- `target_voice`
-  - voice profile id (`type=conversion_target`)
-  - or reference audio
-
-Optional:
-
-- `sample_rate`
-- `normalize_loudness`
-- `output_format`
+- `source_audio`: Path or URL to source recording.
+- `target_speaker_audio`: Path or URL to target identity recording.
+- `steps`: DDIM sampling steps (default: 5).
 
 Outputs:
 
 - converted audio waveform
 - `sample_rate`
 
-Streaming support:
-
-- yes (real-time)
-
-Streaming mode:
-
-- audio input frames are received continuously
-- converted audio frames are returned continuously
+---
 
 # Task: SingingSynthesis (TCSinger2)
 
-Singing synthesis generates expressive singing audio from lyrics and musical information.
+Singing synthesis generates expressive singing audio from lyrics and optional reference audio.
 
 Inputs:
 
-- `lyrics`
-- `melody` or `score` (optional depending on supported mode)
-
-Examples of melody formats:
-
-- MIDI file
-- note sequence JSON
-- MusicXML / score file
-
-Optional:
-
-- `singer_voice` (voice profile id, `type=singer`)
+- `lyrics`: Text to sing.
+- `ref_audio`: Optional path to a reference singer for style/timbre guidance.
 
 Outputs:
 
 - singing audio waveform
 - `sample_rate`
 
-Streaming support:
+---
 
-- no (batch inference)
+# Task: VoiceSculpt (VoiceSculptor)
 
-# Task: VoiceEdit (VoiceSculptor)
-
-Voice editing modifies the timbre or style of an existing speech recording.
+Voice editing/sculpting modifies the timbre or style of an existing speech recording using natural language instructions.
 
 Inputs:
 
-- `input_audio`
-  - path / upload / array
-
-- `style_instruction`
-  - natural language description
-  - or reference audio
-
-Optional:
-
-- `strength` (0–1)
-- `sample_rate`
-- `output_format`
+- `ref_audio`: Path to the input audio to be modified.
+- `instruction`: Natural language description of the desired change.
 
 Outputs:
 
 - edited speech audio waveform
 - `sample_rate`
-
-Streaming support:
-
-- no

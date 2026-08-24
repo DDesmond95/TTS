@@ -38,23 +38,11 @@ def create_custom_voice_page(state: UIState):
             "gen": {"max_new_tokens": max_tokens, "top_p": top_p, "temperature": temp},
         }
 
-        try:
-            if state.mode == "local_engine":
-                assert state.engine is not None
-                from ...tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+        from ...tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
 
-                task = CustomVoiceTask()
-                req = CustomVoiceRequest(**payload)
-                res = await task.run(state.engine, req)
-                audio = str(res.audio_path) if res.audio_path else None
-                return res.run_id, audio, state.safe_json(res.meta)
-
-            api_res = state.api_post("/tts/custom_voice", payload)
-            audio_url = api_res.get("audio_url")
-            audio_path = f"{state.api_url}{audio_url}" if audio_url else None
-            return str(api_res.get("run_id", "")), audio_path, state.safe_json(api_res)
-        except Exception as e:
-            return "", None, f"ERROR: {e}"
+        return await state.run_task(
+            "/tts/custom_voice", CustomVoiceTask, CustomVoiceRequest, payload
+        )
 
     with gr.Row():
         with gr.Column(scale=2):

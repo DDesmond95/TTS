@@ -38,26 +38,17 @@ def create_design_then_clone_page(state: UIState):
             "gen_clone": {"max_new_tokens": max_tokens},
         }
 
-        try:
-            if state.mode == "local_engine":
-                assert state.engine is not None
-                from ...tasks.design_then_clone import (
-                    DesignThenCloneRequest,
-                    DesignThenCloneTask,
-                )
+        from ...tasks.design_then_clone import (
+            DesignThenCloneRequest,
+            DesignThenCloneTask,
+        )
 
-                task = DesignThenCloneTask()
-                req = DesignThenCloneRequest(**payload)
-                res = await task.run(state.engine, req)
-                audio = str(res.audio_path) if res.audio_path else None
-                return res.run_id, audio, state.safe_json(res.meta)
-
-            api_res = state.api_post("/tts/design_then_clone", payload)
-            audio_url = api_res.get("audio_url")
-            audio_path = f"{state.api_url}{audio_url}" if audio_url else None
-            return str(api_res.get("run_id", "")), audio_path, state.safe_json(api_res)
-        except Exception as e:
-            return "", None, f"ERROR: {e}"
+        return await state.run_task(
+            "/tts/design_then_clone",
+            DesignThenCloneTask,
+            DesignThenCloneRequest,
+            payload,
+        )
 
     with gr.Column():
         gr.Markdown(

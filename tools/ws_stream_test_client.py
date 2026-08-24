@@ -4,14 +4,11 @@ import asyncio
 import json
 import time
 
+from .utils import check_websockets
+
 
 async def run(ws_url: str, payload: dict, max_seconds: int = 60) -> None:
-    try:
-        import websockets  # type: ignore
-    except ImportError:
-        raise SystemExit(
-            "Missing dependency: websockets. Install with: pip install websockets"
-        ) from None
+    websockets = check_websockets()
 
     t0 = time.time()
     header = None

@@ -1,3 +1,5 @@
+"""Filesystem path management for OmniVoice Studio."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +8,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Paths:
+    """Container for essential application paths."""
+
     repo_root: Path
     models_dir: Path
     voices_dir: Path
@@ -20,6 +24,19 @@ class Paths:
         outputs_dir: str,
         configs_dir: str,
     ) -> Paths:
+        """
+        Creates a Paths instance from configuration strings, resolving relative paths.
+
+        Args:
+            repo_root: The root directory of the repository.
+            models_dir: Path to the models directory.
+            voices_dir: Path to the voices directory.
+            outputs_dir: Path to the outputs directory.
+            configs_dir: Path to the configs directory.
+
+        Returns:
+            A Paths instance with fully resolved paths.
+        """
         rr = repo_root.resolve()
         return Paths(
             repo_root=rr,

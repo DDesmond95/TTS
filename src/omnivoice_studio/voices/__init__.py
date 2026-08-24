@@ -1,3 +1,5 @@
+"""Voice management package."""
+
 from .schema import VoiceProfile
 from .store import VoiceStore
 

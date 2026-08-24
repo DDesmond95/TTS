@@ -1,0 +1,5 @@
+[codespell]
+skip = .git,.gitlab,.venv,venv,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,.ipynb_checkpoints,build,dist,*.egg-info,*.pyc,*.pyo,*.pyd,*.ipynb,models,outputs/runs,outputs/*.wav,outputs/*.mp3,voices/refs,voices/prompts,Qwen3-TTS,MeanVC,TCSinger2,VoiceSculptor,site,htmlcov
+ignore-words = .codespell-ignore-words.txt
+uri-ignore-words-list = nd,te
+check-hidden = true

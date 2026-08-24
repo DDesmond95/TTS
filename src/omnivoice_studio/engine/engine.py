@@ -1,7 +1,10 @@
+"""Core orchestration engine for OmniVoice Studio TTS models."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from collections import OrderedDict
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -9,29 +12,76 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
+from qwen_tts import Qwen3TTSModel, Qwen3TTSTokenizer
+from qwen_tts.core.models.configuration_qwen3_tts import Qwen3TTSConfig
+from qwen_tts.core.models.modeling_qwen3_tts import Qwen3TTSForConditionalGeneration
+from qwen_tts.core.models.processing_qwen3_tts import Qwen3TTSProcessor
+from transformers import (
+    AutoConfig,
+    AutoModel,
+    AutoModelForCausalLM,
+    AutoProcessor,
+    AutoTokenizer,
+)
+
+# MeanVC/VS/TCS path setup - must be before internal imports if they depend on it
+_ENGINE_ROOT = Path(__file__).resolve().parents[3]
+
+for subroot in ["MeanVC", "VoiceSculptor", "TCSinger2"]:
+    prat = _ENGINE_ROOT / subroot
+    if prat.exists() and str(prat) not in sys.path:
+        sys.path.append(str(prat))
+
+try:
+    from vocos import Vocos
+except ImportError:
+    Vocos = Any  # type: ignore
+
+try:
+    from xcodec2.modeling_xcodec2 import XCodec2Model
+except ImportError:
+    XCodec2Model = Any  # type: ignore
+
+try:
+    from ldm.models.diffusion.cfm1_audio_sampler import CFMSampler
+    from ldm.util import instantiate_from_config
+    from omegaconf import OmegaConf
+except ImportError:
+    OmegaConf = Any  # type: ignore
+    CFMSampler = Any  # type: ignore
+    instantiate_from_config = Any  # type: ignore
 
 from ..config import RuntimeConfig
+from ..exceptions import ModelLoadError, ModelNotFoundError
 from ..models.registry import ModelRegistry
-from ..storage.outputs import OutputManager, RunResult
+from ..storage.outputs import OutputStore, RunResult
+from ..voices.schema import VoiceProfile
 from ..voices.store import VoiceStore
+
+try:
+    # These are available after MeanVC root is in sys.path
+    from src.infer.dit_kvcache import DiT
+    from src.model.utils import load_checkpoint
+except ImportError:
+    DiT = Any  # type: ignore
+    load_checkpoint = Any  # type: ignore
+from .task_runner import TTSTaskRunnerMixin
 
 log = logging.getLogger("omnivoice_studio.engine")
 
 
 @dataclass
 class Loaded:
+    """Container for a loaded model and its metadata."""
+
     model_id: str
     kind: str  # base | customvoice | voicedesign | tokenizer
     obj: Any
 
 
-class TTSEngine:
-    """
-    Single-GPU friendly engine:
-    - max_concurrent_jobs enforced via semaphore (default 1)
-    - simple LRU cache for loaded models (default 1)
-    - no FlashAttention usage; attn_implementation=None
-    """
+class TTSEngine(TTSTaskRunnerMixin):
+    """The orchestrator for all TTS tasks and model management."""
 
     def __init__(
         self,
@@ -40,100 +90,134 @@ class TTSEngine:
         outputs_dir: Path,
         runtime: RuntimeConfig,
     ):
+        """Initializes the TTSEngine."""
         self.registry = ModelRegistry(models_dir)
         self.voices = VoiceStore(voices_dir)
-        self.outputs = OutputManager(outputs_dir)
+        self.outputs = OutputStore(outputs_dir)
         self.runtime = runtime
 
-        self._sem = asyncio.Semaphore(max(1, int(runtime.max_concurrent_jobs)))
+        # device/dtype
+        self.device = runtime.device
+        self.torch_dtype = runtime.torch_dtype
+
+        # Model cache
         self._cache: OrderedDict[str, Loaded] = OrderedDict()
+        self._max_cache = runtime.model_cache_size
 
-    def list_models(self) -> list[dict]:
-        out = []
-        for m in self.registry.scan():
-            out.append({"name": m.name, "kind": m.kind, "path": str(m.path)})
-        return out
+        # Simple semaphore for GPU concurrency
+        self.sem = asyncio.Semaphore(max(1, int(runtime.max_concurrent_jobs)))
 
-    def list_voices(self) -> list[dict]:
-        out = []
-        for v in self.voices.list_profiles():
-            out.append({"id": v.id, "type": v.type, "display_name": v.display_name})
-        return out
+    def list_models(self) -> list[dict[str, Any]]:
+        """Lists all discovered models and their metadata."""
+        return [
+            {"name": m.name, "path": str(m.path.resolve()), "kind": m.kind}
+            for m in self.registry.discover()
+        ]
 
-    def save_voice(self, voice_id: str, profile_data: dict) -> None:
-        from ..voices.schema import VoiceProfile
+    def list_voices(self) -> list[dict[str, Any]]:
+        """Lists all available voice profiles."""
+        return self.voices.list_all()
 
-        profile = VoiceProfile.model_validate(profile_data)
-        self.voices.save(voice_id, profile)
+    def get_voice(self, voice_id: str) -> VoiceProfile | None:
+        """Retrieves a voice profile by its ID."""
+        return self.voices.get(voice_id)
+
+    def save_voice(self, voice_id: str, profile: dict[str, Any]) -> None:
+        """Saves or updates a voice profile."""
+        vp = VoiceProfile(**profile)
+        self.voices.save(voice_id, vp)
 
     def delete_voice(self, voice_id: str) -> bool:
+        """Deletes a voice profile."""
         return self.voices.delete(voice_id)
 
-    def export_voice(self, voice_id: str) -> Path:
-        run_id, run_dir = self.outputs.new_run_dir("export")
-        zip_path = run_dir / f"{voice_id}.zip"
-        return self.voices.export_pack(voice_id, zip_path)
-
-    def import_voice(self, zip_path: str | Path) -> str:
-        return self.voices.import_pack(Path(zip_path))
-
-    def _device_dtype(self) -> tuple[str, Any]:
-        import torch
-
+    def _device_dtype(self) -> tuple[str, torch.dtype]:
+        """Infers the best torch device and dtype from config."""
         device = self.runtime.device
-        if device.startswith("cuda") and not torch.cuda.is_available():
-            device = "cpu"
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        dtype = self.runtime.dtype.lower()
-        if device.startswith("cuda"):
-            torch_dtype = (
-                torch.float16
-                if dtype in ("float16", "fp16")
-                else torch.bfloat16 if dtype in ("bfloat16", "bf16") else torch.float16
-            )
-        else:
-            torch_dtype = torch.float32
-        return device, torch_dtype
+        dt = self.runtime.dtype
+        torch_dt = torch.float32
+        if dt in ("float16", "fp16"):
+            torch_dt = torch.float16
+        elif dt in ("bfloat16", "bf16"):
+            torch_dt = torch.bfloat16
 
-    def _infer_kind_from_id(self, model_id_or_path: str) -> str:
-        n = model_id_or_path.lower()
-        if "tokenizer" in n:
-            return "tokenizer"
-        if "voicedesign" in n:
-            return "voicedesign"
-        if "customvoice" in n:
-            return "customvoice"
-        if "base" in n:
-            return "base"
-        return "unknown"
+        return device, torch_dt
 
-    def _resolve_model(
-        self, model: str | None, expected_kind: str | None = None
-    ) -> str:
+    def infer_kind(self, model_id: str) -> str:
+        """Infers the kind of a model given its ID or path."""
+        return self.registry.infer_kind(model_id)
+
+    def resolve_model(self, model: str | None, expected_kind: str | None = None) -> str:
         """
-        Resolve either:
-        - explicit 'model' (HF id OR local path OR local folder name)
-        - otherwise pick a sane default from models_dir (if present)
+        Resolve a model reference to an absolute local path or HF ID.
+
+        If model is None, it attempts to find a suitable default in the registry.
+
+        Args:
+            model: The model ID, path, or None to auto-pick.
+            expected_kind: The expected kind of the model if auto-picking.
+
+        Returns:
+            The resolved model ID or absolute path.
+
+        Raises:
+            ModelNotFoundError: If no suitable model is found.
         """
+        resolved: str | None = None
+
         if model:
-            # if it's a local folder name inside models_dir, use its path
+            # 1. Check registry
             mi = self.registry.get(model)
             if mi:
-                return str(mi.path)
-            return model
+                resolved = str(mi.path)
+            else:
+                # 2. Check if it's a direct valid path
+                p = Path(model)
+                if p.exists() and p.is_dir():
+                    resolved = str(p.resolve())
+                else:
+                    # 3. Assume it's an HF ID (let transformers handle it later or fail)
+                    resolved = model
+        else:
+            # auto-pick from local registry by expected kind
+            scanned = self.registry.discover()
+            if expected_kind:
+                for m in scanned:
+                    if m.kind == expected_kind:
+                        resolved = str(m.path)
+                        break
 
-        # auto-pick from local registry by expected kind
-        scanned = self.registry.scan()
-        if expected_kind:
-            for m in scanned:
-                if m.kind == expected_kind:
-                    return str(m.path)
-        # fallback: any model
-        if scanned:
-            return str(scanned[0].path)
-        raise RuntimeError("No model provided and no local models found in models_dir")
+            # fallback: first available model if kind not found or not specified
+            if not resolved and scanned:
+                resolved = str(scanned[0].path)
 
-    def _get_or_load(self, model_id_or_path: str, kind: str) -> Any:
+        if not resolved:
+            err_msg = (
+                f"No model provided and no local models found for kind: {expected_kind}"
+                if expected_kind
+                else "No model provided and no local models found in registry"
+            )
+            raise ModelNotFoundError(err_msg)
+
+        return resolved
+
+    def get_or_load(self, model_id_or_path: str, kind: str) -> Any:
+        """
+        Get a model from cache or load it if missing.
+
+        Args:
+            model_id_or_path: The ID or path of the model to load.
+            kind: The kind of the model (e.g., "base", "tokenizer").
+
+        Returns:
+            The loaded model object.
+
+        Raises:
+            ModelLoadError: If the model fails to load or the kind is unsupported.
+        """
         # LRU cache
         if model_id_or_path in self._cache:
             self._cache.move_to_end(model_id_or_path)
@@ -141,366 +225,266 @@ class TTSEngine:
 
         device, torch_dtype = self._device_dtype()
 
-        if kind == "tokenizer":
-            from qwen_tts import Qwen3TTSTokenizer
+        try:
+            obj = None
+            if kind == "tokenizer":
+                obj = self._load_tokenizer(model_id_or_path, device)
+            elif kind in ("base", "customvoice", "voicedesign"):
+                obj = self._load_qwen3(model_id_or_path, kind, device, torch_dtype)
+            elif kind == "meanvc":
+                obj = self._load_meanvc(model_id_or_path, device)
+            elif kind == "voicesculptor":
+                obj = self._load_voicesculptor(model_id_or_path, device, torch_dtype)
+            elif kind == "xcodec2":
+                obj = self._load_xcodec2(model_id_or_path, device)
+            elif kind == "tcsinger":
+                obj = self._load_tcsinger(model_id_or_path, device)
+            else:
+                raise ModelLoadError(f"Unsupported model kind: {kind}")
 
-            obj = Qwen3TTSTokenizer.from_pretrained(
-                model_id_or_path,
-                device_map=device,
+            # Evict if full
+            if len(self._cache) >= self._max_cache:
+                self._cache.popitem(last=False)
+
+            self._cache[model_id_or_path] = Loaded(
+                model_id=model_id_or_path, kind=kind, obj=obj
             )
-        else:
-            from qwen_tts import Qwen3TTSModel
-            from qwen_tts.core.models.configuration_qwen3_tts import Qwen3TTSConfig
-            from qwen_tts.core.models.modeling_qwen3_tts import (
-                Qwen3TTSForConditionalGeneration,
-            )
-            from qwen_tts.core.models.processing_qwen3_tts import Qwen3TTSProcessor
-            from transformers import AutoConfig, AutoModel, AutoProcessor
+            return obj
 
-            # Ensure architectures are registered before AutoConfig.from_pretrained
-            try:
-                AutoConfig.register("qwen3_tts", Qwen3TTSConfig)
-                AutoModel.register(Qwen3TTSConfig, Qwen3TTSForConditionalGeneration)
-                AutoProcessor.register(Qwen3TTSConfig, Qwen3TTSProcessor)
-            except Exception:
-                pass
+        except Exception as e:
+            if not isinstance(e, ModelLoadError):
+                log.exception("Failed to load model %s (%s)", model_id_or_path, kind)
+                raise ModelLoadError(
+                    f"Failed to load {kind} model {model_id_or_path}: {e}"
+                ) from e
+            raise
 
-            cfg_obj = AutoConfig.from_pretrained(
-                model_id_or_path, trust_remote_code=True
-            )
-            if self.runtime.disable_sliding_window:
-                log.info(
-                    "Disabling sliding window attention for model: %s", model_id_or_path
-                )
-                cfg_obj.sliding_window = None
+    def _load_tokenizer(self, model_id_or_path: str, device: str) -> Any:
+        """
+        Loads a Qwen3TTS tokenizer.
 
-            obj = Qwen3TTSModel.from_pretrained(
-                model_id_or_path,
-                config=cfg_obj,
-                device_map=device,
-                dtype=torch_dtype,
-                attn_implementation=self.runtime.attn_implementation,
-            )
+        Args:
+            model_id_or_path: The ID or path of the tokenizer model.
+            device: The device to load the tokenizer on.
 
-        self._cache[model_id_or_path] = Loaded(
-            model_id=model_id_or_path, kind=kind, obj=obj
+        Returns:
+            The loaded tokenizer object.
+        """
+        obj = Qwen3TTSTokenizer.from_pretrained(model_id_or_path, device_map=device)
+        return self._cache_and_return(model_id_or_path, "tokenizer", obj)
+
+    def _load_qwen3(
+        self, model_id_or_path: str, kind: str, device: str, torch_dtype: Any
+    ) -> Any:
+        """
+        Loads a Qwen3TTS model (base, customvoice, or voicedesign).
+
+        Args:
+            model_id_or_path: The ID or path of the Qwen3TTS model.
+            kind: The kind of the Qwen3TTS model.
+            device: The device to load the model on.
+            torch_dtype: The torch data type to use for the model.
+
+        Returns:
+            The loaded Qwen3TTS model object.
+        """
+        try:
+            AutoConfig.register("qwen3_tts", Qwen3TTSConfig)
+            AutoModel.register(Qwen3TTSConfig, Qwen3TTSForConditionalGeneration)
+            AutoProcessor.register(Qwen3TTSConfig, Qwen3TTSProcessor)
+        except Exception:
+            pass
+
+        cfg_obj = AutoConfig.from_pretrained(model_id_or_path, trust_remote_code=True)
+        if self.runtime.disable_sliding_window:
+            cfg_obj.sliding_window = None
+
+        obj = Qwen3TTSModel.from_pretrained(
+            model_id_or_path,
+            config=cfg_obj,
+            device_map=device,
+            dtype=torch_dtype,
+            attn_implementation=self.runtime.attn_implementation or "eager",
         )
-        self._cache.move_to_end(model_id_or_path)
+        return self._cache_and_return(model_id_or_path, kind, obj)
 
-        # evict
+    def _load_meanvc(self, model_id_or_path: str, device: str) -> dict[str, Any]:
+        """
+        Loads a MeanVC model.
+
+        Args:
+            model_id_or_path: The ID or path of the MeanVC model.
+            device: The device to load the model on.
+
+        Returns:
+            A dictionary containing the loaded MeanVC model and vocoder.
+
+        Raises:
+            ModelLoadError: If MeanVC components or files are missing.
+        """
+        if DiT is Any or load_checkpoint is Any:
+            raise ModelLoadError("MeanVC model components not found in sys.path")
+
+        ckpt_path = Path(model_id_or_path) / "model_200ms.safetensors"
+        if not ckpt_path.exists():
+            raise ModelLoadError(f"MeanVC checkpoint not found: {ckpt_path}")
+
+        model = DiT(chunk_size=200).to(device)
+        load_checkpoint(model, str(ckpt_path), device)
+        model.eval()
+
+        vocos_cfg = Path(model_id_or_path) / "config.yaml"
+        vocos_pt = Path(model_id_or_path) / "vocos.pt"
+        if not vocos_cfg.exists() or not vocos_pt.exists():
+            raise ModelLoadError(f"MeanVC Vocos files missing in {model_id_or_path}")
+
+        vocos = Vocos.from_hparams(str(vocos_cfg))
+        vocos.load_state_dict(torch.load(str(vocos_pt), map_location=device))
+        vocos.eval()
+
+        obj = {"model": model, "vocos": vocos}
+        return self._cache_and_return(model_id_or_path, "meanvc", obj)
+
+    def _load_voicesculptor(
+        self, model_id_or_path: str, device: str, torch_dtype: Any
+    ) -> dict[str, Any]:
+        """
+        Loads a VoiceSculptor model.
+
+        Args:
+            model_id_or_path: The ID or path of the VoiceSculptor model.
+            device: The device to load the model on.
+            torch_dtype: The torch data type to use for the model.
+
+        Returns:
+            A dictionary containing the loaded VoiceSculptor model and tokenizer.
+        """
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id_or_path,
+            trust_remote_code=True,
+            torch_dtype=torch_dtype,
+            device_map=device,
+        )
+        tokenizer = AutoTokenizer.from_pretrained(model_id_or_path)
+        obj = {"model": model, "tokenizer": tokenizer}
+        return self._cache_and_return(model_id_or_path, "voicesculptor", obj)
+
+    def _load_xcodec2(self, model_id_or_path: str, device: str) -> Any:
+        """
+        Loads an XCodec2 model.
+
+        Args:
+            model_id_or_path: The ID or path of the XCodec2 model.
+            device: The device to load the model on.
+
+        Returns:
+            The loaded XCodec2 model object.
+
+        Raises:
+            ModelLoadError: If XCodec2 components are missing.
+        """
+        if XCodec2Model is Any:
+            raise ModelLoadError("XCodec2Model components not found in sys.path")
+
+        obj = XCodec2Model.from_pretrained(model_id_or_path)
+        obj.to(device)
+        obj.eval()
+        return self._cache_and_return(model_id_or_path, "xcodec2", obj)
+
+    def _load_tcsinger(self, model_id_or_path: str, device: str) -> Any:
+        """
+        Loads a TCSinger model.
+
+        Args:
+            model_id_or_path: The ID or path of the TCSinger model.
+            device: The device to load the model on.
+
+        Returns:
+            The loaded TCSinger model sampler object.
+
+        Raises:
+            ModelLoadError: If TCSinger components or files are missing.
+        """
+        if OmegaConf is Any or CFMSampler is Any or instantiate_from_config is Any:
+            raise ModelLoadError(
+                "TCSinger2 components (ldm/omegaconf) not found in sys.path"
+            )
+
+        try:
+            from ldm.models.diffusion.cfm1_audio_sampler import CFMSampler
+            from ldm.util import instantiate_from_config
+        except ImportError as e:
+            raise ModelLoadError(
+                f"Failed to import TCSinger2 components from {root}: {e}"
+            ) from e
+
+        config_path = Path(model_id_or_path) / "config.yaml"
+        ckpt_path = Path(model_id_or_path) / "checkpoints" / "last.ckpt"
+        if not config_path.exists() or not ckpt_path.exists():
+            raise ModelLoadError(
+                f"TCSinger2 config or checkpoint missing in {model_id_or_path}"
+            )
+
+        config = OmegaConf.load(str(config_path))
+        model = instantiate_from_config(config.model)
+        model.load_state_dict(
+            torch.load(str(ckpt_path), map_location="cpu")["state_dict"],
+            strict=False,
+        )
+        model = model.to(device)
+        obj = CFMSampler(model, num_timesteps=1000)
+        return self._cache_and_return(model_id_or_path, "tcsinger", obj)
+
+    def _cache_and_return(self, model_id: str, kind: str, obj: Any) -> Any:
+        """
+        Caches a loaded model and returns it, applying LRU eviction if necessary.
+
+        Args:
+            model_id: The ID of the model to cache.
+            kind: The kind of the model.
+            obj: The loaded model object.
+
+        Returns:
+            The loaded model object.
+        """
+        self._cache[model_id] = Loaded(model_id=model_id, kind=kind, obj=obj)
+        self._cache.move_to_end(model_id)
+
         while len(self._cache) > max(1, int(self.runtime.model_cache_size)):
             k, _ = self._cache.popitem(last=False)
             log.info("evicted model from cache: %s", k)
-
         return obj
 
     async def warmup(self, model: str) -> dict:
-        model_id_or_path = self._resolve_model(model)
-        kind = self._infer_kind_from_id(model_id_or_path)
-        async with self._sem:
-            _ = await asyncio.to_thread(self._get_or_load, model_id_or_path, kind)
-        return {"ok": True, "model": model_id_or_path, "kind": kind}
+        """
+        Force load a model into memory.
 
-    async def run_custom_voice(
-        self,
-        text: str | list[str],
-        language: str | list[str] = "Auto",
-        speaker: str | list[str] = "Ryan",
-        instruct: str | list[str] = "",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
+        Args:
+            model: The model ID or path to warm up.
 
-        task = CustomVoiceTask()
-        req = CustomVoiceRequest(
-            text=text,
-            language=language,
-            speaker=speaker,
-            instruct=instruct,
-            model=model,
-            gen=gen or {},
-        )
-        return await task.run(self, req)
+        Returns:
+            A dictionary indicating the status, model ID, and kind of the warmed-up model.
+        """
+        model_id_or_path = self.resolve_model(model)
+        kind = self.registry.infer_kind(Path(model_id_or_path).name)
+        async with self.sem:
+            # get_or_load might be CPU/GPU bound, but let's assume it's okay to call in thread
+            await asyncio.to_thread(self.get_or_load, model_id_or_path, kind)
+        return {"status": "ok", "model": model_id_or_path, "kind": kind}
 
-    async def run_voice_design(
-        self,
-        text: str | list[str],
-        language: str | list[str] = "Auto",
-        instruct: str | list[str] = "",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
-
-        task = VoiceDesignTask()
-        req = VoiceDesignRequest(
-            text=text,
-            language=language,
-            instruct=instruct,
-            model=model,
-            gen=gen or {},
-        )
-        return await task.run(self, req)
-
-    async def run_voice_clone(
-        self,
-        text: str | list[str],
-        language: str | list[str] = "Auto",
-        ref_audio: str | None = None,
-        ref_text: str | None = None,
-        voice_profile: str | None = None,
-        model: str | None = None,
-        x_vector_only_mode: bool = False,
-        use_cached_prompt: bool = True,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
-
-        task = VoiceCloneTask()
-        req = VoiceCloneRequest(
-            text=text,
-            language=language,
-            ref_audio=ref_audio,
-            ref_text=ref_text,
-            voice_profile=voice_profile,
-            model=model,
-            x_vector_only_mode=x_vector_only_mode,
-            use_cached_prompt=use_cached_prompt,
-            gen=gen or {},
-        )
-        return await task.run(self, req)
-
-    async def run_design_then_clone(
-        self,
-        design_text: str,
-        design_language: str,
-        design_instruct: str,
-        clone_text: str | list[str],
-        clone_language: str | list[str] = "Auto",
-        voicedesign_model: str | None = None,
-        base_model: str | None = None,
-        gen_design: dict[str, Any] | None = None,
-        gen_clone: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..tasks.design_then_clone import (
-            DesignThenCloneRequest,
-            DesignThenCloneTask,
-        )
-
-        task = DesignThenCloneTask()
-        req = DesignThenCloneRequest(
-            design_text=design_text,
-            design_language=design_language,
-            design_instruct=design_instruct,
-            clone_text=clone_text,
-            clone_language=clone_language,
-            voicedesign_model=voicedesign_model,
-            base_model=base_model,
-            gen_design=gen_design or {},
-            gen_clone=gen_clone or {},
-        )
-        return await task.run(self, req)
-
-    async def tokenizer_encode(self, audio: str, model: str | None = None) -> RunResult:
-        from ..tasks.tokenizer import TokenizerEncodeRequest, TokenizerEncodeTask
-
-        task = TokenizerEncodeTask()
-        req = TokenizerEncodeRequest(audio=audio, model=model)
-        return await task.run(self, req)
-
-    async def tokenizer_decode(
-        self, codes_json_path: str, model: str | None = None
-    ) -> RunResult:
-        from ..tasks.tokenizer import TokenizerDecodeRequest, TokenizerDecodeTask
-
-        task = TokenizerDecodeTask()
-        req = TokenizerDecodeRequest(codes_json_path=codes_json_path, model=model)
-        return await task.run(self, req)
-
-    # --- Pipeline Runners ---
-
-    async def run_long_form(
-        self,
-        text: str,
-        task_type: str = "custom_voice",
-        speaker: str = "Ryan",
-        language: str = "Auto",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..pipelines.long_form import LongFormPipeline, LongFormRequest
-
-        pipe = LongFormPipeline()
-        req = LongFormRequest(
-            text=text,
-            task_type=task_type,
-            speaker=speaker,
-            language=language,
-            model=model,
-            gen=gen or {},
-        )
-        return await pipe.run(self, req)
-
-    async def run_npc_pack(
-        self,
-        csv_path: str,
-        speaker_map: dict[str, dict[str, Any]],
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..pipelines.npc_pack import NPCPackPipeline, NPCPackRequest
-
-        pipe = NPCPackPipeline()
-        req = NPCPackRequest(
-            csv_path=csv_path, speaker_map=speaker_map, model=model, gen=gen or {}
-        )
-        return await pipe.run(self, req)
-
-    async def run_script_read(
-        self,
-        script_text: str,
-        speaker_map: dict[str, dict[str, Any]],
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> RunResult:
-        from ..pipelines.script_read import ScriptReadPipeline, ScriptReadRequest
-
-        pipe = ScriptReadPipeline()
-        req = ScriptReadRequest(
-            script_text=script_text,
-            speaker_map=speaker_map,
-            model=model,
-            gen=gen or {},
-        )
-        return await pipe.run(self, req)
-
-    async def run_audiobook(
-        self,
-        chapter_paths: list[str],
-        task_type: str = "custom_voice",
-        speaker: str = "Ryan",
-        language: str = "Auto",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-        merge_all: bool = True,
-    ) -> RunResult:
-        from ..pipelines.audiobook import AudiobookPipeline, AudiobookRequest
-
-        pipe = AudiobookPipeline()
-        req = AudiobookRequest(
-            chapter_paths=chapter_paths,
-            task_type=task_type,
-            speaker=speaker,
-            language=language,
-            model=model,
-            gen=gen or {},
-            merge_all=merge_all,
-        )
-        return await pipe.run(self, req)
-
-    async def run_subtitles(
-        self,
-        srt_path: str,
-        speaker: str = "Ryan",
-        language: str = "Auto",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-        preserve_timing: bool = True,
-    ) -> RunResult:
-        from ..pipelines.subtitles import SubtitlesPipeline, SubtitlesRequest
-
-        pipe = SubtitlesPipeline()
-        req = SubtitlesRequest(
-            srt_path=srt_path,
-            speaker=speaker,
-            language=language,
-            model=model,
-            gen=gen or {},
-            preserve_timing=preserve_timing,
-        )
-        return await pipe.run(self, req)
-
-    async def stream_custom_voice(
-        self,
-        text: str,
-        language: str = "Auto",
-        speaker: str = "Ryan",
-        instruct: str = "",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> AsyncIterator[tuple[np.ndarray, int]]:
-        from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
-
-        task = CustomVoiceTask()
-        req = CustomVoiceRequest(
-            text=text,
-            language=language,
-            speaker=speaker,
-            instruct=instruct,
-            model=model,
-            gen=gen or {},
-        )
-        async for chunk in task.stream(self, req):
-            yield chunk
-
-    async def stream_voice_design(
-        self,
-        text: str,
-        language: str = "Auto",
-        instruct: str = "",
-        model: str | None = None,
-        gen: dict[str, Any] | None = None,
-    ) -> AsyncIterator[tuple[np.ndarray, int]]:
-        from ..tasks.voice_design import VoiceDesignRequest, VoiceDesignTask
-
-        task = VoiceDesignTask()
-        req = VoiceDesignRequest(
-            text=text,
-            language=language,
-            instruct=instruct,
-            model=model,
-            gen=gen or {},
-        )
-        async for chunk in task.stream(self, req):
-            yield chunk
-
-    async def stream_voice_clone(
-        self,
-        text: str,
-        language: str = "Auto",
-        ref_audio: str | None = None,
-        ref_text: str | None = None,
-        voice_profile: str | None = None,
-        model: str | None = None,
-        x_vector_only_mode: bool = False,
-        use_cached_prompt: bool = True,
-        gen: dict[str, Any] | None = None,
-    ) -> AsyncIterator[tuple[np.ndarray, int]]:
-        from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
-
-        task = VoiceCloneTask()
-        req = VoiceCloneRequest(
-            text=text,
-            language=language,
-            ref_audio=ref_audio,
-            ref_text=ref_text,
-            voice_profile=voice_profile,
-            model=model,
-            x_vector_only_mode=x_vector_only_mode,
-            use_cached_prompt=use_cached_prompt,
-            gen=gen or {},
-        )
-        async for chunk in task.stream(self, req):
-            yield chunk
-
-    def export_run(self, run_id: str) -> Path:
-        _, run_dir = self.outputs.new_run_dir("export_run")
-        zip_path = run_dir / f"{run_id}.zip"
-        return self.outputs.export_run(run_id, zip_path)
+    # Task and Pipeline methods are provided by TTSTaskRunnerMixin
 
     @staticmethod
     def wav_to_pcm16_bytes(wav: np.ndarray) -> bytes:
+        """
+        Converts a float32 waveform to 16-bit PCM bytes.
+
+        Args:
+            wav: Input float32 waveform array.
+
+        Returns:
+            PCM16 encoded bytes.
+        """
         x = np.asarray(wav, dtype=np.float32)
         x = np.clip(x, -1.0, 1.0)
         i16 = (x * 32767.0).astype(np.int16)

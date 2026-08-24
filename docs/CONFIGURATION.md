@@ -18,8 +18,9 @@ Configuration sources (highest priority wins):
 - DTYPE: "float16" (default)
 - MAX_CONCURRENT_JOBS: default 1 (safe for 6GB)
 - MODEL_CACHE_SIZE: default 1
-- DEFAULT_MAX_NEW_TOKENS: default 1024 (adjust as needed)
-- DEFAULT_TOP_P, DEFAULT_TEMPERATURE: safe defaults
+- DEFAULT_MAX_NEW_TOKENS: default 1024
+- ATTN_IMPLEMENTATION: "eager" (default), "sdpa", or "flash_attention_2"
+- DISABLE_SLIDING_WINDOW: "True" to disable sliding window attention (fixes OOM on some Qwen3 models).
 
 ## API settings
 

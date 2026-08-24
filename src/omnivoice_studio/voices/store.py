@@ -1,16 +1,27 @@
+"""Filesystem-based storage and management of voice profiles."""
+
 from __future__ import annotations
 
+import json
+import logging
+import zipfile
 from pathlib import Path
 
 from .schema import VoiceProfile
 
+log = logging.getLogger("omnivoice_studio.voices.store")
+
 
 class VoiceStore:
+    """Manages voice profiles and associated assets on disk."""
+
     def __init__(self, voices_dir: Path):
+        """Initializes the VoiceStore."""
         self.voices_dir = voices_dir.resolve()
         self.profiles_dir = (self.voices_dir / "profiles").resolve()
 
     def list_profiles(self) -> list[VoiceProfile]:
+        """Lists all voice profiles found in the store."""
         if not self.profiles_dir.exists():
             return []
         out: list[VoiceProfile] = []
@@ -19,22 +30,33 @@ class VoiceStore:
                 out.append(
                     VoiceProfile.model_validate_json(p.read_text(encoding="utf-8"))
                 )
-            except Exception:
+            except (OSError, ValueError):
+                log.warning("Failed to load voice profile: %s", p)
                 continue
         return out
 
+    def list_all(self) -> list[dict]:
+        """Lists metadata of all voices in a simple dict format."""
+        return [
+            {"id": v.id, "type": v.type, "display_name": v.display_name}
+            for v in self.list_profiles()
+        ]
+
     def get(self, voice_id: str) -> VoiceProfile | None:
+        """Retrieves a specific voice profile by ID."""
         p = (self.profiles_dir / f"{voice_id}.json").resolve()
         if not p.exists():
             return None
         return VoiceProfile.model_validate_json(p.read_text(encoding="utf-8"))
 
     def save(self, voice_id: str, profile: VoiceProfile) -> None:
+        """Saves or updates a voice profile."""
         self.profiles_dir.mkdir(parents=True, exist_ok=True)
         p = (self.profiles_dir / f"{voice_id}.json").resolve()
         p.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
 
     def delete(self, voice_id: str) -> bool:
+        """Deletes a voice profile."""
         p = (self.profiles_dir / f"{voice_id}.json").resolve()
         if p.exists():
             p.unlink()
@@ -42,16 +64,17 @@ class VoiceStore:
         return False
 
     def resolve_path(self, rel_or_abs: str) -> Path:
+        """Resolves a path relative to the voices directory."""
         rp = Path(rel_or_abs)
         if rp.is_absolute():
             return rp
         return (self.voices_dir / rp).resolve()
 
     def export_pack(self, voice_id: str, out_zip: Path) -> Path:
-        import zipfile
+        """Exports a voice profile and its assets to a ZIP file."""
         p = self.get(voice_id)
         if not p:
-             raise ValueError(f"Voice {voice_id} not found")
+            raise ValueError(f"Voice {voice_id} not found")
 
         with zipfile.ZipFile(out_zip, "w") as z:
             # 1. Profile JSON
@@ -71,11 +94,17 @@ class VoiceStore:
         return out_zip
 
     def import_pack(self, zip_path: Path) -> str:
-        import json
-        import zipfile
+        """Imports a voice profile from a ZIP file."""
         with zipfile.ZipFile(zip_path, "r") as z:
             # Look for the profile JSON
-            prof_entry = next((n for n in z.namelist() if n.startswith("profiles/") and n.endswith(".json")), None)
+            prof_entry = next(
+                (
+                    n
+                    for n in z.namelist()
+                    if n.startswith("profiles/") and n.endswith(".json")
+                ),
+                None,
+            )
             if not prof_entry:
                 raise ValueError("ZIP does not contain a profiles/*.json file")
 
@@ -88,6 +117,6 @@ class VoiceStore:
                 # Avoid ZipSlip: ensure path is within voices_dir
                 target = (self.voices_dir / member.filename).resolve()
                 if not str(target).startswith(str(self.voices_dir)):
-                     continue
+                    continue
                 z.extract(member, self.voices_dir)
             return voice_id

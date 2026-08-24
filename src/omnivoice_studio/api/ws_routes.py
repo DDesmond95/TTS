@@ -1,5 +1,8 @@
+"""WebSocket routes for real-time TTS streaming."""
+
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -14,6 +17,7 @@ log = logging.getLogger("omnivoice_studio.api.ws")
 
 
 def get_engine() -> TTSEngine:
+    """Provides the TTSEngine instance from the app state."""
     raise RuntimeError("engine dependency not configured")
 
 
@@ -21,6 +25,7 @@ router = APIRouter()
 
 
 async def _recv_start(ws: WebSocket) -> dict[str, Any]:
+    """Receives and validates the initial 'start' message from a WebSocket client."""
     msg = await ws.receive_text()
     data = json.loads(msg)
     if data.get("type") != "start":
@@ -31,8 +36,10 @@ async def _recv_start(ws: WebSocket) -> dict[str, Any]:
 async def _stream_iterator(
     ws: WebSocket, gen: AsyncIterator[tuple[np.ndarray, int]], channels: int = 1
 ) -> None:
-    import asyncio
-
+    """
+    Iterates over an audio generator and sends PCM chunks to a WebSocket client.
+    Listens for a 'stop' command concurrently.
+    """
     header_sent = False
     stop_requested = False
 
@@ -49,7 +56,14 @@ async def _stream_iterator(
                     log.info("Client requested stream stop")
                     stop_requested = True
                     break
-        except Exception:
+        except (
+            json.JSONDecodeError,
+            WebSocketDisconnect,
+            ConnectionError,
+            RuntimeError,
+            ValueError,
+        ):
+            # Connection might have closed during recv
             pass
 
     recv_task = asyncio.create_task(recv_loop())
@@ -82,13 +96,22 @@ async def _stream_iterator(
         except asyncio.CancelledError:
             pass
 
-    await ws.send_text(json.dumps({"type": "end", "ok": not stop_requested, "stopped": stop_requested}))
+    try:
+        await ws.send_text(
+            json.dumps(
+                {"type": "end", "ok": not stop_requested, "stopped": stop_requested}
+            )
+        )
+    except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+        # WebSocket might be closed
+        pass
 
 
 @router.websocket("/ws/tts/custom_voice")
 async def ws_custom_voice(
     ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
+    """WebSocket endpoint for custom voice streaming."""
     await ws.accept()
     try:
         start = await _recv_start(ws)
@@ -108,17 +131,27 @@ async def ws_custom_voice(
         )
         await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
-        return
-    except Exception as e:
-        await ws.send_text(json.dumps({"type": "end", "ok": False, "error": str(e)}))
+        log.info("WebSocket disconnected")
+    except (RuntimeError, ValueError, json.JSONDecodeError) as e:
+        log.exception("Error in custom voice stream")
+        try:
+            await ws.send_text(
+                json.dumps({"type": "end", "ok": False, "error": str(e)})
+            )
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass
     finally:
-        await ws.close()
+        try:
+            await ws.close()
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass
 
 
 @router.websocket("/ws/tts/voice_design")
 async def ws_voice_design(
     ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
+    """WebSocket endpoint for voice design streaming."""
     await ws.accept()
     try:
         start = await _recv_start(ws)
@@ -132,17 +165,27 @@ async def ws_voice_design(
         )
         await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
-        return
-    except Exception as e:
-        await ws.send_text(json.dumps({"type": "end", "ok": False, "error": str(e)}))
+        log.info("WebSocket disconnected")
+    except (RuntimeError, ValueError, json.JSONDecodeError) as e:
+        log.exception("Error in stream")
+        try:
+            await ws.send_text(
+                json.dumps({"type": "end", "ok": False, "error": str(e)})
+            )
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass
     finally:
-        await ws.close()
+        try:
+            await ws.close()
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass
 
 
 @router.websocket("/ws/tts/voice_clone")
 async def ws_voice_clone(
     ws: WebSocket, engine: Annotated[TTSEngine, Depends(get_engine)]
 ) -> None:
+    """WebSocket endpoint for voice clone streaming."""
     await ws.accept()
     try:
         start = await _recv_start(ws)
@@ -169,8 +212,17 @@ async def ws_voice_clone(
         )
         await _stream_iterator(ws, gen)
     except WebSocketDisconnect:
-        return
-    except Exception as e:
-        await ws.send_text(json.dumps({"type": "end", "ok": False, "error": str(e)}))
+        log.info("WebSocket disconnected")
+    except (RuntimeError, ValueError, json.JSONDecodeError) as e:
+        log.exception("Error in voice clone stream")
+        try:
+            await ws.send_text(
+                json.dumps({"type": "end", "ok": False, "error": str(e)})
+            )
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass
     finally:
-        await ws.close()
+        try:
+            await ws.close()
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, ValueError):
+            pass

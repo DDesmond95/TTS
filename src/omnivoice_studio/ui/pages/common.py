@@ -18,6 +18,7 @@ class UIState:
 
         if self.mode == "local_engine":
             from pathlib import Path
+
             self.engine = TTSEngine(
                 models_dir=Path(cfg.paths.models_dir),
                 voices_dir=Path(cfg.paths.voices_dir),
@@ -27,23 +28,76 @@ class UIState:
 
     def api_post(self, path: str, payload: dict) -> dict:
         r = requests.post(f"{self.api_url}{path}", json=payload, timeout=1800)
-        r.raise_for_status()
-        return r.json()
+        try:
+            r.raise_for_status()
+            return r.json()
+        except requests.HTTPError as e:
+            try:
+                # Try to get detailed error from OmniVoice Studio API
+                return r.json()
+            except Exception:
+                return {
+                    "error": "HTTPError",
+                    "message": str(e),
+                    "status": r.status_code,
+                }
 
     def api_get(self, path: str) -> dict:
         r = requests.get(f"{self.api_url}{path}", timeout=60)
-        r.raise_for_status()
-        return r.json()
+        try:
+            r.raise_for_status()
+            return r.json()
+        except requests.HTTPError as e:
+            return {"error": "HTTPError", "message": str(e), "status": r.status_code}
+
+    async def run_task(
+        self, endpoint: str, task_class: Any, request_class: Any, payload: dict
+    ) -> tuple[str, str | None, str]:
+        """
+        Generic runner to handle local vs API and error wrapping.
+        Returns: (run_id, audio_path, metadata_json)
+        """
+        try:
+            if self.mode == "local_engine":
+                assert self.engine is not None
+                task = task_class()
+                req = request_class(**payload)
+                res = await task.run(self.engine, req)
+                audio = str(res.audio_path) if res.audio_path else None
+                return res.run_id, audio, self.safe_json(res.meta)
+
+            api_res = self.api_post(endpoint, payload)
+            if "error" in api_res:
+                return (
+                    "",
+                    None,
+                    f"API ERROR: [{api_res['error']}] {api_res.get('message', '')}\n{self.safe_json(api_res.get('details', {}))}",
+                )
+
+            audio_url = api_res.get("audio_url")
+            audio_path = f"{self.api_url}{audio_url}" if audio_url else None
+            return str(api_res.get("run_id", "")), audio_path, self.safe_json(api_res)
+
+        except Exception as e:
+            from ...exceptions import OmniVoiceError
+
+            if isinstance(e, OmniVoiceError):
+                return (
+                    "",
+                    None,
+                    f"ENGINE ERROR: [{e.__class__.__name__}] {e.message}\n{self.safe_json(e.details)}",
+                )
+            return "", None, f"UNEXPECTED ERROR: {e}"
 
     def api_delete(self, path: str) -> dict:
         if self.mode == "local_engine":
-             # This is tricky because we don't have direct access to engine.delete_voice easily here
-             # without duplicating logic, but for voices it's fine.
-             assert self.engine is not None
-             # voice_id is the last part of path /voices/{id}
-             vid = path.split("/")[-1]
-             ok = self.engine.delete_voice(vid)
-             return {"ok": ok}
+            # This is tricky because we don't have direct access to engine.delete_voice easily here
+            # without duplicating logic, but for voices it's fine.
+            assert self.engine is not None
+            # voice_id is the last part of path /voices/{id}
+            vid = path.split("/")[-1]
+            ok = self.engine.delete_voice(vid)
+            return {"ok": ok}
         r = requests.delete(f"{self.api_url}{path}", timeout=60)
         r.raise_for_status()
         return r.json()
@@ -74,7 +128,9 @@ class UIState:
         labels.sort()
         return labels, mapping
 
-    def voice_choices(self, profile_type: str | None = None) -> tuple[list[str], dict[str, str]]:
+    def voice_choices(
+        self, profile_type: str | None = None
+    ) -> tuple[list[str], dict[str, str]]:
         voices = self.get_voices()
         mapping: dict[str, str] = {}
         labels: list[str] = []

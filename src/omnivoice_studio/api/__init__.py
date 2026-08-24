@@ -1,3 +1,3 @@
-from .app import create_app
+"""API package for OmniVoice Studio HTTP and WebSocket endpoints."""
 
-__all__ = ["create_app"]
+from __future__ import annotations

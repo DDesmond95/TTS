@@ -35,23 +35,11 @@ def create_voice_clone_page(state: UIState):
             "gen": {"max_new_tokens": max_tokens, "top_p": top_p, "temperature": temp},
         }
 
-        try:
-            if state.mode == "local_engine":
-                assert state.engine is not None
-                from ...tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+        from ...tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
 
-                task = VoiceCloneTask()
-                req = VoiceCloneRequest(**payload)
-                res = await task.run(state.engine, req)
-                audio = str(res.audio_path) if res.audio_path else None
-                return res.run_id, audio, state.safe_json(res.meta)
-
-            api_res = state.api_post("/tts/voice_clone", payload)
-            audio_url = api_res.get("audio_url")
-            audio_path = f"{state.api_url}{audio_url}" if audio_url else None
-            return str(api_res.get("run_id", "")), audio_path, state.safe_json(api_res)
-        except Exception as e:
-            return "", None, f"ERROR: {e}"
+        return await state.run_task(
+            "/tts/voice_clone", VoiceCloneTask, VoiceCloneRequest, payload
+        )
 
     with gr.Row():
         with gr.Column(scale=2):

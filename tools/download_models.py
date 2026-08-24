@@ -93,7 +93,7 @@ def main() -> None:
     args = p.parse_args()
 
     # Determine repo root to find specific component subdirs if needed
-    repo_root = Path(__file__).resolve().parents[1]
+    _repo_root = Path(__file__).resolve().parents[1]
     models_dir = Path(args.models_dir).resolve()
     models_dir.mkdir(parents=True, exist_ok=True)
 

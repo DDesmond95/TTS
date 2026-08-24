@@ -1,148 +1,141 @@
-# API
+# 🎙️ OmniVoice Studio API Reference
 
-The HTTP API exposes:
+The OmniVoice Studio API provides a high-performance REST interface for voice synthesis, conversion, and sculpting.
 
-- task execution (non-stream)
-- streaming generation (WebSocket)
-- model and voice management helpers
+## 📡 Base URL
 
-Base URL example:
+Default: `http://localhost:8001`
 
-- http://localhost:8001
+---
 
-## Health
+## 🛠️ System & Management
 
-GET /health
+### Health check
 
-- returns: { "status": "ok" }
+`GET /health` -> `{"status": "ok"}`
 
-GET /ready
+### List Models
 
-- returns readiness, possibly includes loaded model info
+`GET /models` -> Returns a list of local models and their categories.
 
-## Models
+### List Voices
 
-GET /models
+`GET /voices` -> Returns all saved voice profiles.
 
-- list installed models and capabilities
+---
 
-POST /models/warmup
+## 🎙️ Core TTS Tasks
 
-- body: { "model": "..." }
+### Custom Voice (Zero-shot)
 
-## Voices
+`POST /tts/custom_voice`
 
-GET /voices
+- **Body**:
+  ```json
+  {
+    "text": "Hello world",
+    "language": "English",
+    "speaker": "Ryan",
+    "instruct": "Happy and energetic",
+    "model": "optional_model_id"
+  }
+  ```
 
-- list voice profiles
+### Voice Design
 
-POST /voices
+`POST /tts/voice_design`
 
-- create/update voice profile (JSON)
+- **Body**: Similar to Custom Voice, used for designing new voices from text instructions.
 
-## Non-stream tasks
+### Voice Clone
 
-POST /tts/custom_voice
-POST /tts/voice_design
-POST /tts/voice_clone
-POST /tts/design_then_clone
-POST /tokenizer/encode
-POST /tokenizer/decode
+`POST /tts/voice_clone`
 
-Response pattern (recommended):
+- **Body**:
+  ```json
+  {
+    "text": "Target text to speak",
+    "voice_profile": "my_saved_clone_id",
+    "language": "Auto"
+  }
+  ```
 
-- returns JSON with:
-  - run_id
-  - paths or download URLs
-  - metadata
-    Optionally:
-- direct audio bytes if requested (small outputs)
+---
 
-## Errors (recommended)
+## 🔊 Specialized Tasks (Multi-Model)
 
-- 400 for validation errors (including invalid audio format, duration limits, unsupported sample rate/channels)
-- 404 for missing model/voice
-- 409 for concurrency limit reached
-- 500 for runtime errors
+### Voice Conversion (MeanVC)
 
-Error body:
+`POST /tts/voice_conversion`
 
-- { "error": { "code": "...", "message": "...", "details": {...} } }
+- **Body**:
+  ```json
+  {
+    "source_audio": "path/to/source.wav",
+    "target_speaker_audio": "path/to/target.wav",
+    "steps": 5
+  }
+  ```
 
-## Voice conversion
+### Singing Synthesis (TCSinger2)
 
-POST /voice/convert
+`POST /tts/singing_synthesis`
 
-Inputs (recommended: multipart/form-data):
+- **Body**:
+  ```json
+  {
+    "lyrics": "I'm singing in the rain...",
+    "ref_audio": "optional/path/to/style_ref.wav"
+  }
+  ```
 
-- source_audio: WAV/FLAC/MP3 upload (server will resample as needed)
-- target_voice: voice profile id (type=conversion_target) or reference audio
+### Voice Sculpting (VoiceSculptor)
 
-Optional:
+`POST /tts/voice_sculpting`
 
-- output_format: "wav" | "pcm16"
-- sample_rate: integer
-- normalize_loudness: bool
+- **Body**:
+  ```json
+  {
+    "instruction": "Make the voice deeper and more whispery",
+    "ref_audio": "path/to/ref.wav"
+  }
+  ```
 
-Returns:
+---
 
-- JSON with run_id + artifact references + metadata
-  Optionally:
-- direct audio bytes if requested (small outputs)
+## 📦 Response Structure
 
-## Singing synthesis
+All tasks return a consistent `RunResult` object:
 
-POST /sing/generate
+```json
+{
+  "run_id": "2024-03-07_12345_custom_voice",
+  "audio_url": "/outputs/runs/2024-03-07_12345_custom_voice/audio.wav",
+  "meta": {
+    "sample_rate": 24000,
+    "duration_sec": 3.5
+  }
+}
+```
 
-Inputs:
+---
 
-- lyrics: string
-- melody (optional, depending on supported mode):
-  - midi_file upload OR
-  - note list JSON OR
-  - score file upload (if supported)
-    Optional:
-- singer_voice: voice profile id (type=singer)
-- output_format, sample_rate
+## ⚠️ Error Handling
 
-Returns:
+We use standard HTTP codes and a structured error body:
 
-- JSON with run_id + artifact references + metadata
+| Code    | Meaning                              |
+| :------ | :----------------------------------- |
+| **400** | Validation or Inference error        |
+| **404** | Model or Voice not found             |
+| **500** | Critical loading or processing error |
 
-Optionally:
+**Error Response Body:**
 
-- direct audio bytes if requested
-
-## Voice editing
-
-POST /voice/edit
-
-Inputs (recommended: multipart/form-data):
-
-- input_audio: WAV/FLAC/MP3 upload
-- style: instruction string and/or reference audio
-
-Optional:
-
-- strength: float (0–1)
-- output_format, sample_rate, normalize_loudness
-
-Returns:
-
-- JSON with run_id + artifact references + metadata
-  Optionally:
-- direct audio bytes if requested
-
-## Streaming (WebSocket)
-
-See STREAMING.md for protocol details.
-
-TTS streaming:
-
-- WS /ws/tts/custom_voice
-- WS /ws/tts/voice_design
-- WS /ws/tts/voice_clone
-
-Voice conversion streaming:
-
-- WS /ws/voice/live
+```json
+{
+  "error": "ModelLoadError",
+  "message": "Failed to load model: GPU OOM",
+  "details": { "vram_required": "8GB" }
+}
+```

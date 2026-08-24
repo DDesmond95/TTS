@@ -1,3 +1,5 @@
+"""Script reading pipeline for dialogue-based multi-speaker synthesis."""
+
 from __future__ import annotations
 
 import logging
@@ -7,18 +9,22 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel, Field
 
-from ..tasks.custom_voice import CustomVoiceRequest, CustomVoiceTask
-from ..tasks.voice_clone import VoiceCloneRequest, VoiceCloneTask
+from ..storage.outputs import RunResult
+from .base import PipelineHelper
 
 log = logging.getLogger("omnivoice_studio.pipelines.script_read")
 
 
 class ScriptRow(BaseModel):
+    """Represents a single line from a script with a speaker tag."""
+
     speaker: str
     text: str
 
 
 class ScriptReadRequest(BaseModel):
+    """Configuration for a script reading synthesis run."""
+
     script_text: str  # Format: "Speaker: Text"
     speaker_map: dict[str, dict[str, Any]]  # Map "Speaker" tag to task parameters
     model: str | None = None
@@ -27,7 +33,19 @@ class ScriptReadRequest(BaseModel):
 
 
 class ScriptReadPipeline:
-    async def run(self, engine: Any, request: ScriptReadRequest) -> Any:
+    """Pipeline for generating multi-speaker dialogue from a formatted script."""
+
+    async def run(self, engine: Any, request: ScriptReadRequest) -> RunResult:
+        """
+        Executes the script reading pipeline.
+
+        Args:
+            engine: The TTSEngine instance.
+            request: The ScriptReadRequest configuration.
+
+        Returns:
+            A RunResult object containing the stitched dialogue audio.
+        """
         # 1. Parse script
         rows = self._parse_script(request.script_text)
         log.info("Parsed %d lines from script", len(rows))
@@ -36,41 +54,15 @@ class ScriptReadPipeline:
         sample_rate = 24000
 
         for i, row in enumerate(rows):
-            task: Any
-            task_req: Any
             speaker_config = request.speaker_map.get(row.speaker)
             if not speaker_config:
                 log.warning("Unknown speaker tag: %s, skipping", row.speaker)
                 continue
 
-            task_type = speaker_config.get("type", "custom_voice")
-
-            if task_type == "custom_voice":
-                task = CustomVoiceTask()
-                task_req = CustomVoiceRequest(
-                    text=row.text,
-                    language=speaker_config.get("language", "Auto"),
-                    speaker=speaker_config.get("speaker", "Ryan"),
-                    instruct=speaker_config.get("instruct", ""),
-                    model=request.model or speaker_config.get("model"),
-                    gen=request.gen,
-                )
-            else:
-                task = VoiceCloneTask()
-                task_req = VoiceCloneRequest(
-                    text=row.text,
-                    language=speaker_config.get("language", "Auto"),
-                    voice_profile=speaker_config.get("voice_profile"),
-                    ref_audio=speaker_config.get("ref_audio"),
-                    ref_text=speaker_config.get("ref_text"),
-                    model=request.model or speaker_config.get("model"),
-                    gen=request.gen,
-                )
-
-            res = await task.run(engine, task_req)
-
-            import soundfile as sf
-            wav, sr = sf.read(str(res.audio_path))
+            task, task_req = PipelineHelper.prepare_task_from_config(
+                speaker_config, row.text, request.model, request.gen
+            )
+            wav, sr = await PipelineHelper.run_task_and_load(engine, task, task_req)
             sample_rate = sr
             all_wavs.append(wav)
 
@@ -81,33 +73,30 @@ class ScriptReadPipeline:
         # 2. Stitch
         combined = np.concatenate(all_wavs)
 
-        # 3. Save
-        run_id, run_dir = engine.outputs.new_run_dir("script_read")
-        audio_path = engine.outputs.save_wav(run_dir, combined, sample_rate, filename="audio.wav")
-
-        engine.outputs.write_params(run_dir, request.model_dump())
-
-        meta = {
-            "sample_rate": sample_rate,
+        # 3. Finalize
+        meta_extra = {
             "lines": len(rows),
-            "duration_sec": len(combined) / sample_rate
+            "duration_sec": len(combined) / sample_rate,
         }
-        engine.outputs.write_meta(run_dir, meta)
-
-        from ..storage.outputs import RunResult
-        return RunResult(
-            run_id=run_id,
-            run_dir=run_dir,
-            audio_path=audio_path,
+        return PipelineHelper.finalize_run(
+            engine,
+            run_name="script_read",
+            combined_wav=combined,
             sample_rate=sample_rate,
-            meta=meta,
+            params=request.model_dump(),
+            meta_extra=meta_extra,
         )
 
     def _parse_script(self, text: str) -> list[ScriptRow]:
+        """Parses a text script into individual speaker rows."""
         lines = text.strip().split("\n")
         rows = []
         for line in lines:
             match = re.match(r"^([^:]+):\s*(.*)$", line)
             if match:
-                rows.append(ScriptRow(speaker=match.group(1).strip(), text=match.group(2).strip()))
+                rows.append(
+                    ScriptRow(
+                        speaker=match.group(1).strip(), text=match.group(2).strip()
+                    )
+                )
         return rows
